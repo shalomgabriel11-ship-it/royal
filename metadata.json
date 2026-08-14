@@ -1,0 +1,6 @@
+{
+  "name": "Royal Mgwasi Hotel",
+  "description": "4-Star Hotel in Forest Mpya, Mbeya featuring luxury rooms, dining, pool, events, and instant WhatsApp booking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
