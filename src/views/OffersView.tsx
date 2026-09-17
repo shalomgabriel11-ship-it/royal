@@ -8,18 +8,7 @@ interface OffersViewProps {
 }
 
 export const OffersView: React.FC<OffersViewProps> = ({ setActivePage }) => {
-  const { offers, user, memberProfile, openMembershipModal } = useHotelData();
-
-  // Show members_only offers strictly to signed-in members, keeping them hidden for unauthenticated visitors
-  const visibleOffers = offers.filter((offer) => !offer.members_only || Boolean(user));
-
-  const memberName = memberProfile?.full_name || 
-    user?.user_metadata?.full_name || 
-    user?.user_metadata?.name || 
-    user?.email?.split('@')[0] || 
-    'Member';
-  const firstName = memberName.split(' ')[0] || 'Member';
-
+  const { offers } = useHotelData();
   return (
     <div className="section">
       <div className="container">
@@ -31,56 +20,9 @@ export const OffersView: React.FC<OffersViewProps> = ({ setActivePage }) => {
           </p>
         </div>
 
-        {/* Member Status Banner */}
-        {user ? (
-          <div className="mb-8 p-4 sm:p-5 rounded-2xl bg-[#EFE8D9] border border-[#DCD3C1] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#1D5D4C] text-[#F4EFE6] flex items-center justify-center font-bold text-base shadow-sm">
-                ★
-              </div>
-              <div>
-                <p className="text-sm font-bold text-[#2A2620]">
-                  Royal Member Privileges Active &middot; Welcome, {firstName}
-                </p>
-                <p className="text-xs text-[#6E6559]">
-                  Your authenticated session unlocks member-exclusive discounts and VIP perks across all accommodations.
-                </p>
-              </div>
-            </div>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-[#1D5D4C] text-[#F4EFE6] whitespace-nowrap">
-              Member Pricing Enabled
-            </span>
-          </div>
-        ) : (
-          <div className="mb-8 p-4 sm:p-5 rounded-2xl bg-[#F4EFE6] border border-[#E8DED0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#DCD3C1]/60 text-[#1D5D4C] flex items-center justify-center font-bold text-sm">
-                RM
-              </div>
-              <div>
-                <p className="text-sm font-bold text-[#2A2620]">
-                  Are you a Royal Member?
-                </p>
-                <p className="text-xs text-[#6E6559]">
-                  Sign in with Google to unlock exclusive member-only packages, guaranteed late check-out, and welcome perks.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={openMembershipModal}
-              className="btn btn--secondary whitespace-nowrap text-xs py-2 px-4"
-            >
-              Sign In to Unlock Member Rates
-            </button>
-          </div>
-        )}
-
         <div className="grid grid--3">
-          {visibleOffers.map((offer) => (
-            <div 
-              key={offer.id} 
-              className={`info-card flex flex-col justify-between ${offer.members_only ? 'border-2 border-[#1D5D4C]/30 bg-[#FAF7F2]' : ''}`}
-            >
+          {offers.map((offer) => (
+            <div key={offer.id} className="info-card flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-4">
                   <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-[#1D5D4C] text-[#F4EFE6] rounded-full inline-block">
