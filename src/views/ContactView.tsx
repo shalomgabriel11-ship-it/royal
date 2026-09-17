@@ -1,19 +1,39 @@
 import React, { useState } from 'react';
 import { PageView } from '../types';
-import { LANDMARKS, formatWhatsAppUrl } from '../data';
+import { formatWhatsAppUrl, submitContactMessage } from '../data';
+import { useHotelData } from '../context/HotelDataContext';
 
 interface ContactViewProps {
   setActivePage: (page: PageView) => void;
 }
 
 export const ContactView: React.FC<ContactViewProps> = ({ setActivePage }) => {
+  const { landmarks } = useHotelData();
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [contactData, setFormData] = useState({ name: '', phone: '', email: '', message: '' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     setSubmitted(true);
-    const msg = `Hello ROYAL MGWASI HOTEL, message from website:\nName: ${contactData.name}\nPhone: ${contactData.phone}\nMessage: ${contactData.message}`;
+
+    // Dual-write: 1. Persist to Supabase
+    try {
+      await submitContactMessage({
+        full_name: contactData.name,
+        phone: contactData.phone,
+        email: contactData.email || undefined,
+        message: contactData.message
+      });
+    } catch (err) {
+      console.warn('Supabase contact insert notice:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+
+    // Dual-write: 2. Always open WhatsApp
+    const msg = `Hello ROYAL MGWASI HOTEL, message from website:\nName: ${contactData.name}\nPhone: ${contactData.phone}\n${contactData.email ? `Email: ${contactData.email}\n` : ''}Message: ${contactData.message}`;
     window.open(formatWhatsAppUrl(msg), '_blank');
   };
 
@@ -60,7 +80,7 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActivePage }) => {
             <div className="landmark-box">
               <h4>Nearby Distance References</h4>
               <ul className="mt-3">
-                {LANDMARKS.map((lm, i) => (
+                {landmarks.map((lm, i) => (
                   <li key={i} className="flex justify-between py-1 border-b border-[#DCD3C1] last:border-none">
                     <span>{lm.name}</span>
                     <span className="font-semibold">{lm.distance}</span>

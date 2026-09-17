@@ -1,21 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PageView } from '../types';
-import { formatWhatsAppUrl } from '../data';
+import { formatWhatsAppUrl, submitEventInquiry } from '../data';
+import { useHotelData } from '../context/HotelDataContext';
 
 interface EventsViewProps {
   setActivePage: (page: PageView) => void;
 }
 
-const CONFERENCE_IMAGES = [
-  'https://i.ibb.co/2YhShZQg/royal-mgwasi-hotel-C-1-XYnk-N-0-F-1.jpg',
-  'https://i.ibb.co/8nRcCvW6/royal-mgwasi-hotel-C-1-XYnk-N-0-F-2.jpg'
-];
-
 export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
+  const { galleryImages } = useHotelData();
   const [mediaMode, setMediaMode] = useState<'video' | 'photos'>('video');
   const [conferenceImgIdx, setConferenceImgIdx] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -25,17 +23,43 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
     notes: ''
   });
 
+  // Extract events images from storage-backed gallery items if available
+  const eventPhotos = useMemo(() => {
+    return galleryImages
+      .filter(item => item.category === 'Events' && Boolean(item.image))
+      .map(item => item.image as string);
+  }, [galleryImages]);
+
   useEffect(() => {
-    if (isHovered) return;
+    if (isHovered || eventPhotos.length === 0) return;
     const timer = setInterval(() => {
-      setConferenceImgIdx((prev) => (prev + 1) % CONFERENCE_IMAGES.length);
+      setConferenceImgIdx((prev) => (prev + 1) % eventPhotos.length);
     }, 4000);
     return () => clearInterval(timer);
-  }, [isHovered]);
+  }, [isHovered, eventPhotos.length]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     setSubmitted(true);
+
+    // Dual-write: 1. Persist to Supabase
+    try {
+      await submitEventInquiry({
+        full_name: formData.name,
+        phone: formData.phone,
+        event_type: formData.eventType,
+        guest_count: formData.guests,
+        target_date: formData.date || null,
+        notes: formData.notes
+      });
+    } catch (err) {
+      console.warn('Supabase event inquiry insert notice:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+
+    // Dual-write: 2. Always open WhatsApp
     const msg = `Hello ROYAL MGWASI HOTEL, I'd like an Event Quote.\nName: ${formData.name}\nPhone: ${formData.phone}\nEvent Type: ${formData.eventType}\nGuests: ${formData.guests}\nTarget Date: ${formData.date}\nNotes: ${formData.notes}`;
     window.open(formatWhatsAppUrl(msg), '_blank');
   };
@@ -74,7 +98,7 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
                 }`}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                Photos (2)
+                Photos ({eventPhotos.length > 0 ? eventPhotos.length : 0})
               </button>
             </div>
 
@@ -94,67 +118,76 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
               >
-                {CONFERENCE_IMAGES.map((imgSrc, idx) => (
-                  <img
-                    key={idx}
-                    src={imgSrc}
-                    alt={`Main Conference Hall view ${idx + 1} at Royal Mgwasi Hotel`}
-                    loading={idx === 0 ? 'eager' : 'lazy'}
-                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${
-                      conferenceImgIdx === idx ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
-                    }`}
-                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                  />
-                ))}
+                {eventPhotos.length > 0 ? (
+                  <>
+                    {eventPhotos.map((imgSrc, idx) => (
+                      <img
+                        key={idx}
+                        src={imgSrc}
+                        alt={`Main Conference Hall view ${idx + 1} at Royal Mgwasi Hotel`}
+                        loading={idx === 0 ? 'eager' : 'lazy'}
+                        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${
+                          conferenceImgIdx === idx ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
+                        }`}
+                        onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                      />
+                    ))}
 
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent pointer-events-none z-[1]" />
-                
-                {/* Navigation Arrows */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setConferenceImgIdx((prev) => (prev === 0 ? CONFERENCE_IMAGES.length - 1 : prev - 1));
-                  }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label="Previous image"
-                >
-                  &#8249;
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setConferenceImgIdx((prev) => (prev + 1) % CONFERENCE_IMAGES.length);
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label="Next image"
-                >
-                  &#8250;
-                </button>
-
-                {/* Indicators */}
-                <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-xs">
-                  {CONFERENCE_IMAGES.map((_, idx) => (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent pointer-events-none z-[1]" />
+                    
+                    {/* Navigation Arrows */}
                     <button
-                      key={idx}
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setConferenceImgIdx(idx);
+                        setConferenceImgIdx((prev) => (prev === 0 ? eventPhotos.length - 1 : prev - 1));
                       }}
-                      className={`h-1.5 rounded-full transition-all ${
-                        conferenceImgIdx === idx ? 'w-4 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
-                      }`}
-                      aria-label={`Slide ${idx + 1}`}
-                    />
-                  ))}
-                </div>
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Previous image"
+                    >
+                      &#8249;
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConferenceImgIdx((prev) => (prev + 1) % eventPhotos.length);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Next image"
+                    >
+                      &#8250;
+                    </button>
 
-                <div className="ph__label z-[2] relative">
-                  Main Conference Hall
-                  <small className="block text-[11px] opacity-85 mt-0.5">Photo {conferenceImgIdx + 1} of {CONFERENCE_IMAGES.length}</small>
-                </div>
+                    {/* Indicators */}
+                    <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-xs">
+                      {eventPhotos.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConferenceImgIdx(idx);
+                          }}
+                          className={`h-1.5 rounded-full transition-all ${
+                            conferenceImgIdx === idx ? 'w-4 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
+                          }`}
+                          aria-label={`Slide ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="ph__label z-[2] relative">
+                      Main Conference Hall
+                      <small className="block text-[11px] opacity-85 mt-0.5">Photo {conferenceImgIdx + 1} of {eventPhotos.length}</small>
+                    </div>
+                  </>
+                ) : (
+                  <div className="ph__label z-[2] relative">
+                    Main Conference Hall
+                    <small className="block text-[11px] opacity-85 mt-0.5">350+ Guest Capacity &middot; Audio/Visual Ready</small>
+                  </div>
+                )}
               </div>
             )}
             <h3>Main Conference Hall</h3>

@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
 import { PageView } from '../types';
-import { ROOMS, formatWhatsAppUrl } from '../data';
-import { FamilyRoomGallery } from '../components/FamilyRoomGallery';
+import { formatWhatsAppUrl } from '../data';
 import { RoomCardMedia } from '../components/RoomCardMedia';
+import { useHotelData } from '../context/HotelDataContext';
 
 interface RoomsViewProps {
   setActivePage: (page: PageView) => void;
 }
 
 export const RoomsView: React.FC<RoomsViewProps> = ({ setActivePage }) => {
+  const { rooms } = useHotelData();
   const [filter, setFilter] = useState<string>('All');
 
-  const categories = ['All', 'Deluxe', 'Standard', 'Family', 'Suite'];
+  const categories = ['All', 'Standard', 'Suite', 'Superior', 'Executive', 'Apartment'];
+
+  const getCategoryCount = (cat: string) => {
+    if (cat === 'All') return rooms.length;
+    return rooms.filter(r => r.category.toLowerCase() === cat.toLowerCase()).length;
+  };
 
   const filteredRooms = filter === 'All' 
-    ? ROOMS 
-    : ROOMS.filter(r => r.category.toLowerCase() === filter.toLowerCase());
+    ? rooms 
+    : rooms.filter(r => r.category.toLowerCase() === filter.toLowerCase());
 
   return (
     <div className="section">
@@ -40,7 +46,7 @@ export const RoomsView: React.FC<RoomsViewProps> = ({ setActivePage }) => {
                   : 'bg-[#EFE8D9] text-[#2A2620] hover:bg-[#E8DED0]'
               }`}
             >
-              {cat} {cat === 'All' ? `(${ROOMS.length})` : ''}
+              {cat} ({getCategoryCount(cat)})
             </button>
           ))}
         </div>
@@ -97,11 +103,6 @@ export const RoomsView: React.FC<RoomsViewProps> = ({ setActivePage }) => {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Family Room Horizontal Photo Gallery Feature */}
-        <div className="mt-14">
-          <FamilyRoomGallery />
         </div>
 
         {/* Room Guarantee Note */}

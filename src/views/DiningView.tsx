@@ -21,16 +21,8 @@ export const DiningView: React.FC<DiningViewProps> = ({ setActivePage }) => {
         {/* Feature Grid */}
         <div className="grid grid--3">
           <div className="info-card">
-            <div className="ph ph--sand h-48 mb-6 relative overflow-hidden group">
-              <img 
-                src="https://i.ibb.co/zhX93XPd/royal-mgwasi-hotel-DG04-ECy-Mad-H.jpg" 
-                alt="Complimentary Breakfast at Royal Mgwasi Hotel" 
-                loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none z-[1]" />
-              <div className="ph__label z-[2] relative">Complimentary Breakfast</div>
+            <div className="ph ph--sand h-48 mb-6">
+              <div className="ph__label">Complimentary Breakfast</div>
             </div>
             <h3>Fresh Daily Breakfast</h3>
             <p>
@@ -40,16 +32,8 @@ export const DiningView: React.FC<DiningViewProps> = ({ setActivePage }) => {
           </div>
 
           <div className="info-card">
-            <div className="ph ph--forest h-48 mb-6 relative overflow-hidden group">
-              <img 
-                src="https://i.ibb.co/Csw3gnrP/9a7f5ffd9ad17bdccb016bf655dcca0c.jpg" 
-                alt="Signature Tilapia at Royal Mgwasi Hotel" 
-                loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none z-[1]" />
-              <div className="ph__label z-[2] relative">Signature Tilapia &amp; Local Dishes</div>
+            <div className="ph ph--forest h-48 mb-6">
+              <div className="ph__label">Signature Tilapia &amp; Local Dishes</div>
             </div>
             <h3>Our Renowned Tilapia</h3>
             <p>
@@ -59,16 +43,8 @@ export const DiningView: React.FC<DiningViewProps> = ({ setActivePage }) => {
           </div>
 
           <div className="info-card">
-            <div className="ph ph--dusk h-48 mb-6 relative overflow-hidden group">
-              <img 
-                src="https://i.ibb.co/LXg7MpS7/06a8c9b511fe7a3a2aba57ad1c0d47c5.jpg" 
-                alt="Weekend Live Band at Royal Mgwasi Hotel" 
-                loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none z-[1]" />
-              <div className="ph__label z-[2] relative">Weekend Live Band</div>
+            <div className="ph ph--dusk h-48 mb-6">
+              <div className="ph__label">Weekend Live Band</div>
             </div>
             <h3>Live Music Atmosphere</h3>
             <p>

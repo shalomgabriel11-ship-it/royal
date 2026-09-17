@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { RoomOption } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface RoomCardMediaProps {
   room: RoomOption;
@@ -7,7 +8,18 @@ interface RoomCardMediaProps {
 }
 
 export const RoomCardMedia: React.FC<RoomCardMediaProps> = ({ room, labelSubtitle }) => {
-  const imageList = room.images && room.images.length > 0 ? room.images : (room.image ? [room.image] : []);
+  const imageList = useMemo(() => {
+    const rawList = room.images && room.images.length > 0 ? room.images : (room.image ? [room.image] : []);
+    return rawList.map((item) => {
+      if (!item) return '';
+      if (item.startsWith('http://') || item.startsWith('https://')) {
+        return item;
+      }
+      const { data } = supabase.storage.from('room-images').getPublicUrl(item);
+      return data?.publicUrl || item;
+    }).filter(Boolean);
+  }, [room.images, room.image]);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 

@@ -1,13 +1,79 @@
-import React from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { PageView } from '../types';
-import { formatWhatsAppUrl, ROOMS, REVIEWS, LANDMARKS } from '../data';
+import { formatWhatsAppUrl } from '../data';
 import { RoomCardMedia } from '../components/RoomCardMedia';
+import { useHotelData } from '../context/HotelDataContext';
 
 interface HomeViewProps {
   setActivePage: (page: PageView) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
+  const { rooms, reviews, landmarks } = useHotelData();
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [isPrevDisabled, setIsPrevDisabled] = useState(true);
+  const [isNextDisabled, setIsNextDisabled] = useState(false);
+
+  // Calculate scroll distance: one full card width + track gap
+  const getScrollAmount = useCallback(() => {
+    if (!trackRef.current) return 360;
+    const firstCard = trackRef.current.querySelector('.rooms-scroller__card') as HTMLElement | null;
+    if (!firstCard) return 360;
+    const cardWidth = firstCard.getBoundingClientRect().width;
+    const gap = parseFloat(window.getComputedStyle(trackRef.current).gap) || 24;
+    return cardWidth + gap;
+  }, []);
+
+  // Check scroll boundary and update disabled states on navigation arrows
+  const updateArrows = useCallback(() => {
+    if (!trackRef.current) return;
+    const track = trackRef.current;
+    const maxScrollLeft = track.scrollWidth - track.clientWidth - 2;
+    const currentScroll = track.scrollLeft;
+
+    setIsPrevDisabled(currentScroll <= 2);
+    setIsNextDisabled(currentScroll >= maxScrollLeft);
+  }, []);
+
+  const handlePrev = () => {
+    if (!trackRef.current) return;
+    trackRef.current.scrollBy({
+      left: -getScrollAmount(),
+      behavior: 'smooth',
+    });
+  };
+
+  const handleNext = () => {
+    if (!trackRef.current) return;
+    trackRef.current.scrollBy({
+      left: getScrollAmount(),
+      behavior: 'smooth',
+    });
+  };
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    let rafId: number;
+    const handleScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updateArrows);
+    };
+
+    track.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', updateArrows, { passive: true });
+
+    // Initial boundary check
+    updateArrows();
+
+    return () => {
+      track.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', updateArrows);
+      cancelAnimationFrame(rafId);
+    };
+  }, [updateArrows]);
+
   return (
     <>
       {/* HERO SECTION */}
@@ -90,27 +156,82 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
             </button>
           </div>
 
-          <div className="grid grid--3">
-            {ROOMS.slice(0, 3).map((room) => (
-              <article key={room.id} className="room-card">
-                <RoomCardMedia room={room} />
-                <div className="room-card__body">
-                  <h3>{room.name}</h3>
-                  <p className="room-card__tags">{room.tags.join(' · ')}</p>
-                  <p className="room-card__desc">{room.description}</p>
-                  <div className="room-card__foot">
-                    <a 
-                      href={formatWhatsAppUrl(`Hello ROYAL MGWASI HOTEL, I'd like to ask about the ${room.name}.`)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn--primary btn--block"
-                    >
-                      Ask about {room.name.split(' ')[0]}
-                    </a>
+          <div className="rooms-scroller">
+            {/* Left Navigation Arrow */}
+            <button
+              type="button"
+              className="rooms-scroller__arrow rooms-scroller__arrow--prev"
+              aria-label="Previous rooms"
+              disabled={isPrevDisabled}
+              onClick={handlePrev}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+
+            {/* Right Navigation Arrow */}
+            <button
+              type="button"
+              className="rooms-scroller__arrow rooms-scroller__arrow--next"
+              aria-label="Next rooms"
+              disabled={isNextDisabled}
+              onClick={handleNext}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+
+            {/* Horizontally Scrollable Track */}
+            <div
+              ref={trackRef}
+              className="rooms-scroller__track"
+              tabIndex={0}
+              role="region"
+              aria-label="Featured rooms"
+            >
+              {rooms.map((room) => (
+                <article key={room.id} className="room-card rooms-scroller__card">
+                  <RoomCardMedia room={room} />
+                  <div className="room-card__body">
+                    <h3>{room.name}</h3>
+                    <p className="room-card__tags">{room.tags.join(' · ')}</p>
+                    <p className="room-card__desc">{room.description}</p>
+                    <div className="room-card__foot">
+                      <a 
+                        href={formatWhatsAppUrl(`Hello ROYAL MGWASI HOTEL, I'd like to ask about the ${room.name}.`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn--primary btn--block"
+                      >
+                        Ask about {room.name.split(' ')[0]}
+                      </a>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -133,38 +254,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
               </button>
             </div>
             <div className="hub-tiles">
-              <div className="ph ph--sand relative overflow-hidden group">
-                <img 
-                  src="https://i.ibb.co/zhX93XPd/royal-mgwasi-hotel-DG04-ECy-Mad-H.jpg" 
-                  alt="Fresh Breakfast at Royal Mgwasi Hotel" 
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none z-[1]" />
-                <div className="ph__label z-[2] relative">Fresh Breakfast</div>
+              <div className="ph ph--sand">
+                <div className="ph__label">Fresh Breakfast</div>
               </div>
-              <div className="ph ph--forest relative overflow-hidden group">
-                <img 
-                  src="https://i.ibb.co/Csw3gnrP/9a7f5ffd9ad17bdccb016bf655dcca0c.jpg" 
-                  alt="Signature Tilapia at Royal Mgwasi Hotel" 
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none z-[1]" />
-                <div className="ph__label z-[2] relative">Signature Tilapia</div>
+              <div className="ph ph--forest">
+                <div className="ph__label">Signature Tilapia</div>
               </div>
-              <div className="ph ph--dusk relative overflow-hidden group">
-                <img 
-                  src="https://i.ibb.co/LXg7MpS7/06a8c9b511fe7a3a2aba57ad1c0d47c5.jpg" 
-                  alt="Weekend Live Band at Royal Mgwasi Hotel" 
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none z-[1]" />
-                <div className="ph__label z-[2] relative">Weekend Live Band</div>
+              <div className="ph ph--dusk">
+                <div className="ph__label">Weekend Live Band</div>
               </div>
             </div>
           </div>
@@ -181,27 +278,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
             </div>
             <div className="hub-tiles">
               <div className="ph ph--slate"><div className="ph__label">Outdoor Pool</div></div>
-              <div className="ph ph--sand relative overflow-hidden group">
-                <img 
-                  src="https://i.ibb.co/d4TMkwDW/royal-mgwasi-hotel-C8ty-Nhr-MRo-W.jpg" 
-                  alt="Breakfast & Restaurant at Royal Mgwasi Hotel" 
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none z-[1]" />
-                <div className="ph__label z-[2] relative">Breakfast &amp; Restaurant</div>
+              <div className="ph ph--sand">
+                <div className="ph__label">Breakfast &amp; Restaurant</div>
               </div>
-              <div className="ph ph--dusk relative overflow-hidden group">
-                <img 
-                  src="https://i.ibb.co/LXg7MpS7/06a8c9b511fe7a3a2aba57ad1c0d47c5.jpg" 
-                  alt="Weekend Live Music at Royal Mgwasi Hotel" 
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none z-[1]" />
-                <div className="ph__label z-[2] relative">Weekend Live Music</div>
+              <div className="ph ph--dusk">
+                <div className="ph__label">Weekend Live Music</div>
               </div>
             </div>
             <ul className="amenity-list">
@@ -302,7 +383,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
               <div className="landmark-box">
                 <h4>Nearby reference points</h4>
                 <ul>
-                  {LANDMARKS.slice(0, 6).map((lm, idx) => (
+                  {landmarks.slice(0, 6).map((lm, idx) => (
                     <li key={idx}>
                       {lm.name} <span>&middot; {lm.distance} ({lm.note})</span>
                     </li>
@@ -361,7 +442,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
           <p className="lede mt-12">A 4.3 rating from 118 Google reviews. Here are verified highlights from past guests.</p>
 
           <div className="grid grid--3 mt-32">
-            {REVIEWS.slice(0, 3).map((review) => (
+            {reviews.slice(0, 3).map((review) => (
               <article key={review.id} className="testimonial">
                 <div className="testimonial__name">{review.name}</div>
                 <div className="testimonial__trip">{review.tripType}</div>

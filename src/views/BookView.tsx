@@ -1,25 +1,53 @@
 import React, { useState } from 'react';
 import { PageView } from '../types';
-import { ROOMS, formatWhatsAppUrl } from '../data';
+import { formatWhatsAppUrl, submitBooking } from '../data';
+import { useHotelData } from '../context/HotelDataContext';
 
 interface BookViewProps {
   setActivePage: (page: PageView) => void;
 }
 
 export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
+  const { rooms } = useHotelData();
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
-  const [selectedRoom, setSelectedRoom] = useState(ROOMS[0].name);
+  const [selectedRoom, setSelectedRoom] = useState(rooms[0]?.name || 'Junior Suite');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
   const [guestCount, setGuestCount] = useState('2 Guests');
   const [specialRequests, setSpecialRequests] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     setSubmitted(true);
 
+    // Identify matching room for DB row
+    const matchedRoom = rooms.find(r => r.name === selectedRoom) || rooms[0];
+    const roomId = matchedRoom?.id || rooms[0]?.id;
+
+    // Dual-write: 1. Persist to Supabase
+    try {
+      if (roomId) {
+        await submitBooking({
+          guest_name: guestName,
+          guest_phone: guestPhone,
+          room_id: roomId,
+          check_in: checkIn,
+          check_out: checkOut,
+          guest_count_label: guestCount,
+          special_requests: specialRequests || undefined
+        });
+      }
+    } catch (err) {
+      console.warn('Supabase booking record notice:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+
+    // Dual-write: 2. Always open WhatsApp confirmation link
     const messageLines = [
       "Hello ROYAL MGWASI HOTEL, I'd like to reserve a room.",
       `Guest Name: ${guestName || 'Not specified'}`,
@@ -87,9 +115,9 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
                   value={selectedRoom}
                   onChange={e => setSelectedRoom(e.target.value)}
                 >
-                  {ROOMS.map(rm => (
+                  {rooms.map(rm => (
                     <option key={rm.id} value={rm.name}>
-                      {rm.name} ({rm.capacity}) &mdash; {rm.tags[0]}
+                      {rm.name} ({rm.capacity}) &mdash; {rm.tags[0] || rm.category}
                     </option>
                   ))}
                   <option value="Any available room">Any Available Room</option>

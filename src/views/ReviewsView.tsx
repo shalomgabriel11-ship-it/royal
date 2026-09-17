@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { PageView, ReviewItem } from '../types';
-import { REVIEWS } from '../data';
+import { PageView } from '../types';
+import { submitReview } from '../data';
+import { useHotelData } from '../context/HotelDataContext';
 
 interface ReviewsViewProps {
   setActivePage: (page: PageView) => void;
 }
 
 export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
-  const [reviewsList, setReviewsList] = useState<ReviewItem[]>(REVIEWS);
+  const { reviews } = useHotelData();
   const [newReview, setNewReview] = useState({
     name: '',
     tripType: 'Leisure stay',
@@ -15,23 +16,28 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
     comment: ''
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAddReview = (e: React.FormEvent) => {
+  const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReview.name || !newReview.comment) return;
 
-    const item: ReviewItem = {
-      id: Date.now().toString(),
-      name: newReview.name,
-      tripType: newReview.tripType,
-      rating: Number(newReview.rating),
-      date: 'Just now',
-      comment: newReview.comment
-    };
-
-    setReviewsList([item, ...reviewsList]);
-    setSubmitted(true);
-    setNewReview({ name: '', tripType: 'Leisure stay', rating: 5, comment: '' });
+    setIsSubmitting(true);
+    try {
+      await submitReview({
+        guest_name: newReview.name,
+        trip_type: newReview.tripType,
+        rating: Number(newReview.rating),
+        comment: newReview.comment
+      });
+      setSubmitted(true);
+      setNewReview({ name: '', tripType: 'Leisure stay', rating: 5, comment: '' });
+    } catch (err) {
+      console.warn('Error submitting review:', err);
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -116,12 +122,16 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
 
               {submitted && (
                 <div className="form-success is-visible my-3">
-                  Thank you! Your review has been added below.
+                  Thank you! Your review has been submitted for moderation and will appear once approved by reception.
                 </div>
               )}
 
-              <button type="submit" className="btn btn--primary btn--block mt-4">
-                Submit Review
+              <button 
+                type="submit" 
+                disabled={isSubmitting} 
+                className="btn btn--primary btn--block mt-4"
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Review'}
               </button>
             </form>
           </div>
@@ -130,7 +140,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
         {/* Reviews List */}
         <h2 className="text-2xl font-serif mb-6">Recent Guest Comments</h2>
         <div className="grid grid--3">
-          {reviewsList.map((rev) => (
+          {reviews.map((rev) => (
             <article key={rev.id} className="testimonial flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between">

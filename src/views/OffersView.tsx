@@ -1,12 +1,14 @@
 import React from 'react';
 import { PageView } from '../types';
-import { OFFERS, formatWhatsAppUrl } from '../data';
+import { formatWhatsAppUrl } from '../data';
+import { useHotelData } from '../context/HotelDataContext';
 
 interface OffersViewProps {
   setActivePage: (page: PageView) => void;
 }
 
 export const OffersView: React.FC<OffersViewProps> = ({ setActivePage }) => {
+  const { offers } = useHotelData();
   return (
     <div className="section">
       <div className="container">
@@ -19,12 +21,19 @@ export const OffersView: React.FC<OffersViewProps> = ({ setActivePage }) => {
         </div>
 
         <div className="grid grid--3">
-          {OFFERS.map((offer) => (
+          {offers.map((offer) => (
             <div key={offer.id} className="info-card flex flex-col justify-between">
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-[#1D5D4C] text-[#F4EFE6] rounded-full inline-block mb-4">
-                  {offer.badge}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap mb-4">
+                  <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-[#1D5D4C] text-[#F4EFE6] rounded-full inline-block">
+                    {offer.badge}
+                  </span>
+                  {offer.members_only && (
+                    <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-[#8C6D3B] text-[#F4EFE6] rounded-full inline-flex items-center gap-1 shadow-sm">
+                      <span>★</span> Member Exclusive
+                    </span>
+                  )}
+                </div>
                 <h3>{offer.title}</h3>
                 <p className="mt-3">{offer.description}</p>
 

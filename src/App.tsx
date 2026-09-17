@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PageView } from './types';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { HotelDataProvider } from './context/HotelDataContext';
 import { HomeView } from './views/HomeView';
 import { RoomsView } from './views/RoomsView';
 import { DiningView } from './views/DiningView';
@@ -12,6 +13,7 @@ import { StoryView } from './views/StoryView';
 import { ReviewsView } from './views/ReviewsView';
 import { ContactView } from './views/ContactView';
 import { BookView } from './views/BookView';
+import { MembershipPopup } from './components/MembershipPopup';
 
 export default function App() {
   const [activePage, setActivePage] = useState<PageView>('home');
@@ -48,12 +50,16 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4EFE6] text-[#2A2620]">
-      <Navbar activePage={activePage} setActivePage={setActivePage} />
-      <main className="flex-1" id="main-content">
-        {renderView()}
-      </main>
-      <Footer setActivePage={setActivePage} />
-    </div>
+    <HotelDataProvider>
+      <div className="min-h-screen flex flex-col bg-[#F4EFE6] text-[#2A2620]">
+        <Navbar activePage={activePage} setActivePage={setActivePage} />
+        <main className="flex-1" id="main-content">
+          {renderView()}
+        </main>
+        <Footer setActivePage={setActivePage} />
+        <MembershipPopup />
+      </div>
+    </HotelDataProvider>
   );
 }
+

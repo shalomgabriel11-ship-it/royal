@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageView } from '../types';
-import { GALLERY_IMAGES } from '../data';
+import { useHotelData } from '../context/HotelDataContext';
 
 interface GalleryViewProps {
   setActivePage: (page: PageView) => void;
@@ -67,15 +67,16 @@ const HOTEL_VIDEOS: VideoItem[] = [
 ];
 
 export const GalleryView: React.FC<GalleryViewProps> = ({ setActivePage }) => {
+  const { galleryImages } = useHotelData();
   const [activeTab, setActiveTab] = useState<string>('All');
 
   const categories = ['All', 'Videos', 'Rooms', 'Dining', 'Pool', 'Grounds', 'Events'];
 
   const filteredImages = activeTab === 'All'
-    ? GALLERY_IMAGES
+    ? galleryImages
     : activeTab === 'Videos'
       ? []
-      : GALLERY_IMAGES.filter(img => img.category.toLowerCase() === activeTab.toLowerCase());
+      : galleryImages.filter(img => img.category.toLowerCase() === activeTab.toLowerCase());
 
   return (
     <div className="section">
