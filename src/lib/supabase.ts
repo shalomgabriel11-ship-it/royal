@@ -1,21 +1,12 @@
 /// <reference types="vite/client" />
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = 'https://peknslhedvvenfzmlrjm.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBla25zbGhlZHZ2ZW5mem1scmptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1MzY1MDEsImV4cCI6MjEwNTExMjUwMX0.kQ9t6jFrexKixqFIXOwwQ1VXcxBRGTcYpx-G2p7ZYNc';
 
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && 
-  supabaseAnonKey && 
-  !supabaseUrl.includes('placeholder') &&
-  supabaseUrl.startsWith('http')
-);
+export const isSupabaseConfigured = true;
 
-// Fallback to avoid module crash if environment variables aren't injected yet
-const safeUrl = isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co';
-const safeKey = isSupabaseConfigured ? supabaseAnonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy';
-
-export const supabase = createClient(safeUrl, safeKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export function getRoomImageUrl(storagePath: string | null | undefined): string | null {
   if (!storagePath) return null;
