@@ -26,6 +26,7 @@ interface HotelDataContextType {
   loading: boolean;
   user: User | null;
   memberProfile: MemberProfile | null;
+  isMember: boolean;
   isMembershipModalOpen: boolean;
   setIsMembershipModalOpen: (open: boolean) => void;
   openMembershipModal: () => void;
@@ -49,6 +50,7 @@ const HotelDataContext = createContext<HotelDataContextType>({
   loading: false,
   user: null,
   memberProfile: null,
+  isMember: false,
   isMembershipModalOpen: false,
   setIsMembershipModalOpen: () => {},
   openMembershipModal: () => {},
@@ -73,51 +75,111 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [memberProfile, setMemberProfile] = useState<MemberProfile | null>(null);
   const [isMembershipModalOpen, setIsMembershipModalOpen] = useState(false);
 
-  const fetchMemberProfile = useCallback(async (currentUserId: string) => {
+  // Fetch member profile from 'members' table with automatic single retry for signup trigger race condition
+  const fetchMemberProfile = useCallback(async (currentUserId: string, currentUser?: User | null) => {
     if (!isSupabaseConfigured) return;
     try {
       const { data, error } = await supabase
         .from('members')
-        .select('*')
+        .select('id, email, full_name, avatar_url, joined_at, is_active')
         .eq('id', currentUserId)
         .maybeSingle();
-      if (!error && data) {
+
+      if (error) {
+        console.error(`[Supabase Members] Error fetching member row for user ${currentUserId}:`, error);
+      }
+
+      if (data) {
         setMemberProfile(data);
+        return;
+      }
+
+      // If the row doesn't exist yet, the signup trigger in Postgres may still be completing.
+      // Retry once after a 1200ms delay rather than showing the visitor as signed-out.
+      console.warn(`[Supabase Members] No member row found for ${currentUserId} on initial lookup. Waiting 1200ms for database trigger to create row...`);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      const retryResult = await supabase
+        .from('members')
+        .select('id, email, full_name, avatar_url, joined_at, is_active')
+        .eq('id', currentUserId)
+        .maybeSingle();
+
+      if (retryResult.error) {
+        console.error(`[Supabase Members] Retry failed fetching member row for user ${currentUserId}:`, retryResult.error);
+      }
+
+      if (retryResult.data) {
+        setMemberProfile(retryResult.data);
+        return;
+      }
+
+      // If row still not found after retry, construct resilient member profile from user metadata
+      // so visitor is NEVER displayed as signed-out when a valid auth session exists
+      console.warn(`[Supabase Members] Member row still not present after retry for ${currentUserId}. Using fallback profile from auth metadata.`);
+      if (currentUser) {
+        const fallback: MemberProfile = {
+          id: currentUserId,
+          email: currentUser.email || null,
+          full_name: (currentUser.user_metadata?.full_name as string) || 
+                     (currentUser.user_metadata?.name as string) || 
+                     currentUser.email?.split('@')[0] || 
+                     'Member',
+          avatar_url: (currentUser.user_metadata?.avatar_url as string) || 
+                      (currentUser.user_metadata?.picture as string) || 
+                      null,
+          joined_at: currentUser.created_at || new Date().toISOString(),
+          is_active: true
+        };
+        setMemberProfile(fallback);
       }
     } catch (err) {
-      // Table may still be initializing or RLS active
-      console.warn('Notice loading member profile:', err);
+      console.error(`[Supabase Members] Unexpected exception while loading member profile for ${currentUserId}:`, err);
     }
   }, []);
 
-  // Listen to Auth State
+  // Listen to Auth State reliably across app lifecycle
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
-    // Get current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        fetchMemberProfile(currentUser.id);
-      } else {
-        setMemberProfile(null);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        setIsMembershipModalOpen(false);
-        fetchMemberProfile(currentUser.id);
-      } else {
-        setMemberProfile(null);
-      }
-      // Re-fetch offers whenever auth state changes so member-only offers immediately reflect
-      fetchOffers().then(data => {
-        if (data && data.length > 0) setOffers(data);
+    // 1. App Load: Check existing session once
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('[Supabase Auth] Failed to retrieve session on app load:', error);
+        }
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          fetchMemberProfile(currentUser.id, currentUser);
+        } else {
+          setMemberProfile(null);
+        }
+      })
+      .catch((err) => {
+        console.error('[Supabase Auth] Exception during initial getSession:', err);
       });
+
+    // 2. Auth State Change: Subscribe to real-time sign-in and sign-out events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      try {
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          setIsMembershipModalOpen(false);
+          await fetchMemberProfile(currentUser.id, currentUser);
+        } else {
+          setMemberProfile(null);
+        }
+
+        // Re-fetch offers whenever auth state changes so member-only offers immediately reflect
+        const freshOffers = await fetchOffers();
+        if (freshOffers && freshOffers.length > 0) {
+          setOffers(freshOffers);
+        }
+      } catch (err) {
+        console.error(`[Supabase Auth] Error processing onAuthStateChange (${event}):`, err);
+      }
     });
 
     return () => {
@@ -127,27 +189,37 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const signInWithGoogle = useCallback(async () => {
     try {
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: window.location.href,
         }
       });
+      if (error) {
+        console.error('[Supabase Auth] Error initiating Google sign-in:', error);
+      }
     } catch (err) {
-      console.error('Error signing in with Google:', err);
+      console.error('[Supabase Auth] Unexpected exception initiating Google sign-in:', err);
     }
   }, []);
 
   const signOut = useCallback(async () => {
     try {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('[Supabase Auth] Error signing out from Supabase:', error);
+      }
+    } catch (err) {
+      console.error('[Supabase Auth] Unexpected exception signing out:', err);
+    } finally {
       setUser(null);
       setMemberProfile(null);
-      // Refresh offers to public only
-      const pubOffers = await fetchOffers();
-      if (pubOffers && pubOffers.length > 0) setOffers(pubOffers);
-    } catch (err) {
-      console.error('Error signing out:', err);
+      try {
+        const pubOffers = await fetchOffers();
+        if (pubOffers && pubOffers.length > 0) setOffers(pubOffers);
+      } catch (err) {
+        console.error('[Supabase Offers] Error refreshing offers after sign out:', err);
+      }
     }
   }, []);
 
@@ -233,6 +305,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         loading,
         user,
         memberProfile,
+        isMember: Boolean(user),
         isMembershipModalOpen,
         setIsMembershipModalOpen,
         openMembershipModal,

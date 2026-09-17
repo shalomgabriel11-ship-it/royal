@@ -29,13 +29,26 @@ export const MembershipPopup: React.FC = () => {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
+    // If user is already signed in via context, never schedule or show
+    if (user) {
+      setIsVisible(false);
+      return;
+    }
+
     let timer: NodeJS.Timeout | null = null;
 
     const checkAndSchedule = async () => {
-      // 1. Never show if user is already signed in
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        return;
+      // 1. Initial check: Never schedule if session is already present
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('[MembershipPopup] Error checking initial session in popup scheduler:', error);
+        }
+        if (session?.user) {
+          return;
+        }
+      } catch (err) {
+        console.error('[MembershipPopup] Exception checking initial session:', err);
       }
 
       // 2. Check localStorage 7-day suppression
@@ -48,13 +61,33 @@ export const MembershipPopup: React.FC = () => {
           }
         }
       } catch (e) {
-        console.warn('Storage read warning:', e);
+        console.error('[MembershipPopup] Storage read error for dismissal state:', e);
       }
 
-      // 3. Start 60-second timer
-      timer = setTimeout(() => {
-        setIsVisible(true);
-        setIsMembershipModalOpen(true);
+      // 3. Start 60-second timer — crucially checking fresh when it fires
+      timer = setTimeout(async () => {
+        // Fresh check right at moment of trigger in case user signed in mid-visit
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error) {
+            console.error('[MembershipPopup] Error checking fresh session on 60s trigger:', error);
+          }
+          if (session?.user) {
+            // User signed in while timer was running: abort showing popup
+            return;
+          }
+        } catch (err) {
+          console.error('[MembershipPopup] Exception checking fresh session on trigger:', err);
+        }
+
+        // Only display if user is still not signed in
+        setIsVisible((prev) => {
+          if (!user) {
+            setIsMembershipModalOpen(true);
+            return true;
+          }
+          return prev;
+        });
       }, POPUP_DELAY_MS);
     };
 
@@ -63,7 +96,7 @@ export const MembershipPopup: React.FC = () => {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [setIsMembershipModalOpen]);
+  }, [user, setIsMembershipModalOpen]);
 
   const handleDismiss = useCallback(() => {
     setIsVisible(false);
@@ -71,7 +104,7 @@ export const MembershipPopup: React.FC = () => {
     try {
       localStorage.setItem(STORAGE_KEY, Date.now().toString());
     } catch (e) {
-      console.warn('Storage write warning:', e);
+      console.error('[MembershipPopup] Storage write error on dismissal:', e);
     }
   }, [closeMembershipModal]);
 
@@ -85,11 +118,11 @@ export const MembershipPopup: React.FC = () => {
         },
       });
       if (error) {
-        console.error('Google sign-in error:', error.message);
+        console.error('[Supabase Auth] Google sign-in OAuth error:', error);
         setIsSigningIn(false);
       }
     } catch (err) {
-      console.error('OAuth initiation failure:', err);
+      console.error('[Supabase Auth] Exception during OAuth initiation:', err);
       setIsSigningIn(false);
     }
   };

@@ -185,12 +185,22 @@ export const DEFAULT_REVIEWS: ReviewItem[] = [
 
 export const DEFAULT_OFFERS: OfferItem[] = [
   {
+    id: 'member-club-exclusive',
+    title: 'Royal Member Exclusive Package',
+    badge: 'Member Exclusive',
+    description: 'Exclusive 15% discount on all room categories, complimentary poolside welcome beverage, and guaranteed late check-out at 2:30 PM.',
+    perks: ['15% Room Rate Reduction', 'Complimentary Welcome Drink', 'Guaranteed Late Check-out at 2:30 PM', 'Priority Live Band Seating'],
+    priceNote: 'Exclusive Member Benefit',
+    members_only: true
+  },
+  {
     id: 'weekend-escape',
     title: 'Weekend Live Music & Stay Package',
     badge: 'Popular',
     description: 'Enjoy a 2-night weekend stay inclusive of daily free breakfast and reserved VIP seating for our Fri-Sun live band performance.',
     perks: ['2 Nights Deluxe Room', 'Complimentary Breakfast', 'Reserved Live Band Seating', 'Late Check-out at 2:00 PM'],
-    priceNote: 'Inquire for Weekend Rate'
+    priceNote: 'Inquire for Weekend Rate',
+    members_only: false
   },
   {
     id: 'corporate-rate',
@@ -198,7 +208,8 @@ export const DEFAULT_OFFERS: OfferItem[] = [
     badge: 'Business',
     description: 'Special discounted rates for business executives and delegates visiting Mbeya for conferences, university events, or meetings.',
     perks: ['Discounted Room Rate', 'Free Fast Wi-Fi', 'Express Laundry Service', 'Invoice / EFD Receipt Available'],
-    priceNote: 'Special Business Discount'
+    priceNote: 'Special Business Discount',
+    members_only: false
   },
   {
     id: 'long-stay',
@@ -206,7 +217,8 @@ export const DEFAULT_OFFERS: OfferItem[] = [
     badge: 'Best Value',
     description: 'Planning a longer visit in Mbeya? Save significantly on stays of 7 consecutive nights or more with complimentary laundry credits.',
     perks: ['Up to 20% Off Room Rate', 'Complimentary Weekly Laundry', 'Daily Room Service', 'Free Airport Shuttle Assistance'],
-    priceNote: '7+ Night Discount'
+    priceNote: '7+ Night Discount',
+    members_only: false
   }
 ];
 
@@ -349,7 +361,7 @@ export async function fetchOffers(): Promise<OfferItem[]> {
       .order('sort_order', { ascending: true });
 
     if (error) {
-      console.warn('Supabase offers query error:', error.message);
+      console.error('[Supabase Offers] Supabase offers query error:', error);
       return DEFAULT_OFFERS;
     }
 
@@ -367,7 +379,7 @@ export async function fetchOffers(): Promise<OfferItem[]> {
       members_only: item.members_only || false
     }));
   } catch (err) {
-    console.warn('Error fetching offers from Supabase, using defaults:', err);
+    console.error('[Supabase Offers] Unexpected exception fetching offers from Supabase:', err);
     return DEFAULT_OFFERS;
   }
 }
