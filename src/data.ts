@@ -342,11 +342,18 @@ export async function fetchReviews(): Promise<ReviewItem[]> {
 
 export async function fetchOffers(): Promise<OfferItem[]> {
   try {
-    const { data, error } = await supabase
-      .from('offers')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
+    const [{ data, error }, { data: settingsData }] = await Promise.all([
+      supabase
+        .from('offers')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'member_only_offers')
+        .maybeSingle()
+    ]);
 
     if (error) {
       console.warn('Supabase offers query error:', error.message);
@@ -357,6 +364,16 @@ export async function fetchOffers(): Promise<OfferItem[]> {
       return DEFAULT_OFFERS;
     }
 
+    let memberOnlySet = new Set<string>();
+    if (settingsData?.value) {
+      try {
+        const parsed = JSON.parse(settingsData.value);
+        if (Array.isArray(parsed)) {
+          memberOnlySet = new Set(parsed);
+        }
+      } catch {}
+    }
+
     return data.map((item: any) => ({
       id: item.id,
       title: item.title,
@@ -364,7 +381,7 @@ export async function fetchOffers(): Promise<OfferItem[]> {
       description: item.description || '',
       perks: Array.isArray(item.perks) ? item.perks : [],
       priceNote: item.price_note || 'Special Rate',
-      members_only: item.members_only || false
+      members_only: item.members_only !== undefined ? Boolean(item.members_only) : memberOnlySet.has(item.id)
     }));
   } catch (err) {
     console.warn('Error fetching offers from Supabase, using defaults:', err);
