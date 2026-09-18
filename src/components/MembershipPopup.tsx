@@ -16,6 +16,13 @@ export const MembershipPopup: React.FC = () => {
 
   const [isVisible, setIsVisible] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
 
   // Synchronize with context manual modal open trigger
   useEffect(() => {
@@ -67,6 +74,8 @@ export const MembershipPopup: React.FC = () => {
 
   const handleDismiss = useCallback(() => {
     setIsVisible(false);
+    setAuthError(null);
+    setAuthNotice(null);
     closeMembershipModal(7);
     try {
       localStorage.setItem(STORAGE_KEY, Date.now().toString());
@@ -91,6 +100,59 @@ export const MembershipPopup: React.FC = () => {
     } catch (err) {
       console.error('OAuth initiation failure:', err);
       setIsSigningIn(false);
+    }
+  };
+
+  const handleEmailAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmittingEmail) return;
+
+    setAuthError(null);
+    setAuthNotice(null);
+    setIsSubmittingEmail(true);
+
+    try {
+      if (authMode === 'signup') {
+        const trimmedName = fullName.trim();
+        if (!trimmedName) {
+          setAuthError('Please enter your full name.');
+          setIsSubmittingEmail(false);
+          return;
+        }
+
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: {
+              full_name: trimmedName,
+            },
+          },
+        });
+
+        if (error) {
+          setAuthError(error.message);
+        } else if (data?.user && !data?.session) {
+          setAuthNotice('Check your email to confirm your account before signing in.');
+        } else {
+          handleDismiss();
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (error) {
+          setAuthError(error.message);
+        } else {
+          handleDismiss();
+        }
+      }
+    } catch (err: any) {
+      setAuthError(err?.message || 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsSubmittingEmail(false);
     }
   };
 
@@ -124,7 +186,7 @@ export const MembershipPopup: React.FC = () => {
       }}
     >
       <div 
-        className="relative w-full max-w-lg bg-[#FAF7F2] text-[#2A2620] rounded-2xl shadow-2xl border border-[#DCD3C1] p-6 sm:p-8 overflow-hidden transform transition-all"
+        className="relative w-full max-w-lg bg-[#FAF7F2] text-[#2A2620] rounded-2xl shadow-2xl border border-[#DCD3C1] p-6 sm:p-8 overflow-hidden transform transition-all max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Decorative corner accent */}
@@ -164,7 +226,7 @@ export const MembershipPopup: React.FC = () => {
 
         {/* Subtext */}
         <p className="text-sm sm:text-base leading-relaxed text-[#6E6559] mb-6">
-          Join free with Google. Members get first access to offers, weekend live-band updates, and everything happening at the hotel — before anyone else.
+          Join free with Google or your email. Members get first access to offers, weekend live-band updates, and everything happening at the hotel — before anyone else.
         </p>
 
         {/* Benefits list (compact) */}
@@ -184,7 +246,7 @@ export const MembershipPopup: React.FC = () => {
         </div>
 
         {/* Continue with Google button */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -226,6 +288,112 @@ export const MembershipPopup: React.FC = () => {
               </>
             )}
           </button>
+
+          {/* Divider */}
+          <div className="relative my-4 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#DCD3C1]"></div>
+            </div>
+            <span className="relative bg-[#FAF7F2] px-3 text-xs uppercase tracking-wider text-[#6E6559] font-semibold">
+              or
+            </span>
+          </div>
+
+          {/* Email/Password Form */}
+          <form onSubmit={handleEmailAuthSubmit} className="space-y-3">
+            {authMode === 'signup' && (
+              <div className="field !mt-0">
+                <label>Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. John Mwasambili"
+                  value={fullName}
+                  onChange={(e) => {
+                    setAuthError(null);
+                    setAuthNotice(null);
+                    setFullName(e.target.value);
+                  }}
+                />
+              </div>
+            )}
+
+            <div className={`field ${authMode === 'signin' ? '!mt-0' : '!mt-3'}`}>
+              <label>Email Address *</label>
+              <input
+                type="email"
+                required
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => {
+                  setAuthError(null);
+                  setAuthNotice(null);
+                  setEmail(e.target.value);
+                }}
+              />
+            </div>
+
+            <div className="field !mt-3">
+              <label>Password *</label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => {
+                  setAuthError(null);
+                  setAuthNotice(null);
+                  setPassword(e.target.value);
+                }}
+              />
+            </div>
+
+            {authError && (
+              <p className="text-xs text-[#8B261E] font-semibold mt-1.5">
+                {authError}
+              </p>
+            )}
+
+            {authNotice && (
+              <div className="p-3 my-2 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-medium leading-relaxed">
+                {authNotice}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmittingEmail}
+              className="w-full mt-4 flex items-center justify-center gap-3 bg-[#1D5D4C] hover:bg-[#164B3D] text-[#F4EFE6] font-semibold text-sm sm:text-base py-3.5 px-6 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.99] disabled:opacity-75 disabled:cursor-not-allowed"
+            >
+              {isSubmittingEmail ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  {authMode === 'signup' ? 'Creating account...' : 'Signing in...'}
+                </span>
+              ) : (
+                <span>{authMode === 'signup' ? 'Create Account' : 'Sign In'}</span>
+              )}
+            </button>
+
+            {/* Toggle mode link */}
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthError(null);
+                  setAuthNotice(null);
+                  setAuthMode(authMode === 'signup' ? 'signin' : 'signup');
+                }}
+                className="text-xs text-[#1D5D4C] hover:text-[#164B3D] font-semibold hover:underline transition-colors focus:outline-none"
+              >
+                {authMode === 'signup' ? 'Already a member? Sign in' : 'New here? Create an account'}
+              </button>
+            </div>
+          </form>
 
           {/* "Not now" text link */}
           <div className="text-center pt-1">

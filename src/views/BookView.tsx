@@ -1,28 +1,76 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 import { formatWhatsAppUrl, submitBooking } from '../data';
 import { useHotelData } from '../context/HotelDataContext';
 
 interface BookViewProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
-  const { rooms } = useHotelData();
-  const [guestName, setGuestName] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
+  const navigate = useNavigate();
+  const { rooms, user, memberProfile } = useHotelData();
+  const [guestName, setGuestName] = useState(memberProfile?.full_name || user?.user_metadata?.full_name || '');
+  const [guestPhone, setGuestPhone] = useState(memberProfile?.phone || '');
   const [selectedRoom, setSelectedRoom] = useState(rooms[0]?.name || 'Junior Suite');
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
   const [guestCount, setGuestCount] = useState('2 Guests');
   const [specialRequests, setSpecialRequests] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [dbError, setDbError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const getMinCheckOut = (inDate: string) => {
+    if (!inDate) return todayStr;
+    const d = new Date(inDate);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  };
+
+  const clearSubmissionState = () => {
+    if (submitted) {
+      setSubmitted(false);
+      setDbError(false);
+    }
+  };
+
+  const handleCheckInChange = (val: string) => {
+    clearSubmissionState();
+    setCheckIn(val);
+    if (checkOut && val && checkOut <= val) {
+      setDateError('Check-out date must be after check-in date.');
+    } else {
+      setDateError(null);
+    }
+  };
+
+  const handleCheckOutChange = (val: string) => {
+    clearSubmissionState();
+    setCheckOut(val);
+    if (checkIn && val && val <= checkIn) {
+      setDateError('Check-out date must be after check-in date.');
+    } else {
+      setDateError(null);
+    }
+  };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
+    if (checkIn && checkOut && checkOut <= checkIn) {
+      setDateError('Check-out date must be after check-in date.');
+      return;
+    }
+    setDateError(null);
+
     setIsSubmitting(true);
-    setSubmitted(true);
+    let dbSaveOk = false;
 
     // Identify matching room for DB row
     const matchedRoom = rooms.find(r => r.name === selectedRoom) || rooms[0];
@@ -31,20 +79,21 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
     // Dual-write: 1. Persist to Supabase
     try {
       if (roomId) {
-        await submitBooking({
+        const res = await submitBooking({
           guest_name: guestName,
           guest_phone: guestPhone,
           room_id: roomId,
           check_in: checkIn,
           check_out: checkOut,
           guest_count_label: guestCount,
-          special_requests: specialRequests || undefined
+          special_requests: specialRequests || undefined,
+          member_id: user?.id ?? null
         });
+        dbSaveOk = Boolean(res?.success);
       }
     } catch (err) {
       console.warn('Supabase booking record notice:', err);
-    } finally {
-      setIsSubmitting(false);
+      dbSaveOk = false;
     }
 
     // Dual-write: 2. Always open WhatsApp confirmation link
@@ -66,6 +115,10 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
 
     const finalUrl = formatWhatsAppUrl(messageLines.join('\n'));
     window.open(finalUrl, '_blank');
+
+    setIsSubmitting(false);
+    setSubmitted(true);
+    setDbError(!dbSaveOk);
   };
 
   return (
@@ -94,7 +147,10 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
                     required 
                     placeholder="e.g. John Mwasambili"
                     value={guestName}
-                    onChange={e => setGuestName(e.target.value)}
+                    onChange={e => {
+                      clearSubmissionState();
+                      setGuestName(e.target.value);
+                    }}
                   />
                 </div>
                 <div className="field">
@@ -104,7 +160,10 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
                     required 
                     placeholder="+255 762 555 557"
                     value={guestPhone}
-                    onChange={e => setGuestPhone(e.target.value)}
+                    onChange={e => {
+                      clearSubmissionState();
+                      setGuestPhone(e.target.value);
+                    }}
                   />
                 </div>
               </div>
@@ -113,7 +172,10 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
                 <label>Select Room Type *</label>
                 <select 
                   value={selectedRoom}
-                  onChange={e => setSelectedRoom(e.target.value)}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setSelectedRoom(e.target.value);
+                  }}
                 >
                   {rooms.map(rm => (
                     <option key={rm.id} value={rm.name}>
@@ -130,8 +192,9 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
                   <input 
                     type="date" 
                     required
+                    min={todayStr}
                     value={checkIn}
-                    onChange={e => setCheckIn(e.target.value)}
+                    onChange={e => handleCheckInChange(e.target.value)}
                   />
                 </div>
                 <div className="field">
@@ -139,17 +202,26 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
                   <input 
                     type="date" 
                     required
+                    min={getMinCheckOut(checkIn)}
                     value={checkOut}
-                    onChange={e => setCheckOut(e.target.value)}
+                    onChange={e => handleCheckOutChange(e.target.value)}
                   />
                 </div>
               </div>
+              {dateError && (
+                <p className="text-xs text-[#8B261E] font-semibold mt-1.5">
+                  {dateError}
+                </p>
+              )}
 
               <div className="field mt-4">
                 <label>Number of Guests</label>
                 <select 
                   value={guestCount}
-                  onChange={e => setGuestCount(e.target.value)}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setGuestCount(e.target.value);
+                  }}
                 >
                   <option value="1 Adult">1 Adult</option>
                   <option value="2 Guests">2 Guests (1 King/Queen or Twin)</option>
@@ -164,19 +236,42 @@ export const BookView: React.FC<BookViewProps> = ({ setActivePage }) => {
                   rows={3} 
                   placeholder="e.g. Late night arrival at 10 PM, ground floor room request, or airport shuttle needed."
                   value={specialRequests}
-                  onChange={e => setSpecialRequests(e.target.value)}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setSpecialRequests(e.target.value);
+                  }}
                 ></textarea>
               </div>
 
-              {submitted && (
+              {submitted && !dbError && (
                 <div className="form-success is-visible my-3">
                   Opening WhatsApp to send your reservation request directly to reception...
                 </div>
               )}
 
+              {submitted && dbError && (
+                <div className="p-3.5 my-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm font-medium leading-relaxed">
+                  We've opened WhatsApp with your reservation request, but our online database backup couldn't be saved. Please double check that your message sends on WhatsApp — if WhatsApp did not open, please call or message us directly at +255 762 555 557.
+                </div>
+              )}
+
               <div className="mt-6">
-                <button type="submit" className="btn btn--primary btn--block btn--lg">
-                  Send Booking Request on WhatsApp
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting || Boolean(dateError)}
+                  className="btn btn--primary btn--block btn--lg disabled:opacity-75 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      <span>Opening WhatsApp...</span>
+                    </span>
+                  ) : (
+                    'Send Booking Request on WhatsApp'
+                  )}
                 </button>
               </div>
 

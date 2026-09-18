@@ -8,7 +8,8 @@ export type PageView =
   | 'our-story'
   | 'reviews'
   | 'contact'
-  | 'book';
+  | 'book'
+  | 'account';
 
 export interface RoomOption {
   id: string;
@@ -52,6 +53,7 @@ export interface MemberProfile {
   full_name?: string | null;
   email?: string | null;
   avatar_url?: string | null;
+  phone?: string | null;
   joined_at?: string;
   is_active?: boolean;
 }

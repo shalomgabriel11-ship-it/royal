@@ -1,40 +1,56 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 import { formatWhatsAppUrl, submitContactMessage } from '../data';
 import { useHotelData } from '../context/HotelDataContext';
 
 interface ContactViewProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 export const ContactView: React.FC<ContactViewProps> = ({ setActivePage }) => {
+  const navigate = useNavigate();
   const { landmarks } = useHotelData();
   const [submitted, setSubmitted] = useState(false);
+  const [dbError, setDbError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [contactData, setFormData] = useState({ name: '', phone: '', email: '', message: '' });
 
+  const clearSubmissionState = () => {
+    if (submitted) {
+      setSubmitted(false);
+      setDbError(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setIsSubmitting(true);
-    setSubmitted(true);
+    let dbSaveOk = false;
 
     // Dual-write: 1. Persist to Supabase
     try {
-      await submitContactMessage({
+      const res = await submitContactMessage({
         full_name: contactData.name,
         phone: contactData.phone,
         email: contactData.email || undefined,
         message: contactData.message
       });
+      dbSaveOk = Boolean(res?.success);
     } catch (err) {
       console.warn('Supabase contact insert notice:', err);
-    } finally {
-      setIsSubmitting(false);
+      dbSaveOk = false;
     }
 
     // Dual-write: 2. Always open WhatsApp
     const msg = `Hello ROYAL MGWASI HOTEL, message from website:\nName: ${contactData.name}\nPhone: ${contactData.phone}\n${contactData.email ? `Email: ${contactData.email}\n` : ''}Message: ${contactData.message}`;
     window.open(formatWhatsAppUrl(msg), '_blank');
+
+    setIsSubmitting(false);
+    setSubmitted(true);
+    setDbError(!dbSaveOk);
   };
 
   return (
@@ -103,7 +119,10 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActivePage }) => {
                   required 
                   placeholder="e.g. Maria Joseph"
                   value={contactData.name}
-                  onChange={e => setFormData({...contactData, name: e.target.value})}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setFormData({...contactData, name: e.target.value});
+                  }}
                 />
               </div>
 
@@ -115,7 +134,10 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActivePage }) => {
                     required 
                     placeholder="+255 762 555 557"
                     value={contactData.phone}
-                    onChange={e => setFormData({...contactData, phone: e.target.value})}
+                    onChange={e => {
+                      clearSubmissionState();
+                      setFormData({...contactData, phone: e.target.value});
+                    }}
                   />
                 </div>
                 <div className="field">
@@ -124,7 +146,10 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActivePage }) => {
                     type="email" 
                     placeholder="name@example.com"
                     value={contactData.email}
-                    onChange={e => setFormData({...contactData, email: e.target.value})}
+                    onChange={e => {
+                      clearSubmissionState();
+                      setFormData({...contactData, email: e.target.value});
+                    }}
                   />
                 </div>
               </div>
@@ -136,18 +161,41 @@ export const ContactView: React.FC<ContactViewProps> = ({ setActivePage }) => {
                   required
                   placeholder="How can we assist you with your upcoming visit to Mbeya?"
                   value={contactData.message}
-                  onChange={e => setFormData({...contactData, message: e.target.value})}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setFormData({...contactData, message: e.target.value});
+                  }}
                 ></textarea>
               </div>
 
-              {submitted && (
+              {submitted && !dbError && (
                 <div className="form-success is-visible my-3">
                   Thank you! Opening WhatsApp to deliver your message instantly...
                 </div>
               )}
 
-              <button type="submit" className="btn btn--primary btn--block btn--lg mt-6">
-                Send Message via WhatsApp
+              {submitted && dbError && (
+                <div className="p-3.5 my-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm font-medium leading-relaxed">
+                  We've opened WhatsApp with your message, but our online database backup couldn't be saved. Please double check that your message sends on WhatsApp — if WhatsApp did not open, please call or message us directly at +255 762 555 557.
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="btn btn--primary btn--block btn--lg mt-6 disabled:opacity-75 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span>Opening WhatsApp...</span>
+                  </span>
+                ) : (
+                  'Send Message via WhatsApp'
+                )}
               </button>
             </form>
           </div>

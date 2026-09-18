@@ -1,13 +1,18 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 
 interface FooterProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ setActivePage }) => {
+  const navigate = useNavigate();
+
   const handlePageClick = (page: PageView) => {
-    setActivePage(page);
+    if (setActivePage) setActivePage(page);
+    const targetPath = page === 'home' ? '/' : `/${page}`;
+    navigate(targetPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

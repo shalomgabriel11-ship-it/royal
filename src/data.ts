@@ -453,6 +453,7 @@ export interface BookingSubmissionPayload {
   check_out: string;
   guest_count_label?: string;
   special_requests?: string;
+  member_id?: string | null;
 }
 
 export async function submitBooking(payload: BookingSubmissionPayload) {
@@ -502,7 +503,8 @@ export async function submitBooking(payload: BookingSubmissionPayload) {
           guest_count_label: payload.guest_count_label || null,
           special_requests: payload.special_requests || null,
           status: 'pending',
-          source: 'website'
+          source: 'website',
+          member_id: payload.member_id ?? null
         }
       ]);
 
@@ -590,6 +592,7 @@ export interface ReviewSubmissionPayload {
   trip_type?: string;
   rating: number;
   comment: string;
+  member_id?: string | null;
 }
 
 export async function submitReview(payload: ReviewSubmissionPayload) {
@@ -602,7 +605,8 @@ export async function submitReview(payload: ReviewSubmissionPayload) {
           trip_type: payload.trip_type || 'Verified Guest',
           rating: payload.rating,
           comment: payload.comment,
-          is_published: false // Moderation gate enforced by RLS policy
+          is_published: false, // Moderation gate enforced by RLS policy
+          member_id: payload.member_id ?? null
         }
       ]);
 

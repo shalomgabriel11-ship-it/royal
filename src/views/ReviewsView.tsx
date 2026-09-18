@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 import { submitReview } from '../data';
 import { useHotelData } from '../context/HotelDataContext';
 
 interface ReviewsViewProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
-  const { reviews } = useHotelData();
+  const navigate = useNavigate();
+  const { reviews, initialLoading, user, memberProfile } = useHotelData();
   const [newReview, setNewReview] = useState({
-    name: '',
+    name: memberProfile?.full_name || user?.user_metadata?.full_name || '',
     tripType: 'Leisure stay',
     rating: 5,
     comment: ''
@@ -18,9 +20,14 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const handleBookClick = () => {
+    if (setActivePage) setActivePage('book');
+    navigate('/book');
+  };
+
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newReview.name || !newReview.comment) return;
+    if (!newReview.name || !newReview.comment || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
@@ -28,7 +35,8 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
         guest_name: newReview.name,
         trip_type: newReview.tripType,
         rating: Number(newReview.rating),
-        comment: newReview.comment
+        comment: newReview.comment,
+        member_id: user?.id ?? null
       });
       setSubmitted(true);
       setNewReview({ name: '', tripType: 'Leisure stay', rating: 5, comment: '' });
@@ -80,14 +88,20 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
                     required 
                     placeholder="e.g. David B."
                     value={newReview.name}
-                    onChange={e => setNewReview({...newReview, name: e.target.value})}
+                    onChange={e => {
+                      if (submitted) setSubmitted(false);
+                      setNewReview({...newReview, name: e.target.value});
+                    }}
                   />
                 </div>
                 <div className="field">
                   <label>Rating</label>
                   <select 
                     value={newReview.rating}
-                    onChange={e => setNewReview({...newReview, rating: Number(e.target.value)})}
+                    onChange={e => {
+                      if (submitted) setSubmitted(false);
+                      setNewReview({...newReview, rating: Number(e.target.value)});
+                    }}
                   >
                     <option value={5}>★★★★★ (5/5 Excellent)</option>
                     <option value={4}>★★★★☆ (4/5 Very Good)</option>
@@ -100,7 +114,10 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
                 <label>Trip Type</label>
                 <select 
                   value={newReview.tripType}
-                  onChange={e => setNewReview({...newReview, tripType: e.target.value})}
+                  onChange={e => {
+                    if (submitted) setSubmitted(false);
+                    setNewReview({...newReview, tripType: e.target.value});
+                  }}
                 >
                   <option value="Leisure stay">Leisure stay</option>
                   <option value="Business trip">Business trip</option>
@@ -116,7 +133,10 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
                   required
                   placeholder="Share details of your room, meals, or staff service..."
                   value={newReview.comment}
-                  onChange={e => setNewReview({...newReview, comment: e.target.value})}
+                  onChange={e => {
+                    if (submitted) setSubmitted(false);
+                    setNewReview({...newReview, comment: e.target.value});
+                  }}
                 ></textarea>
               </div>
 
@@ -129,7 +149,7 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
               <button 
                 type="submit" 
                 disabled={isSubmitting} 
-                className="btn btn--primary btn--block mt-4"
+                className="btn btn--primary btn--block mt-4 disabled:opacity-75 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Review'}
               </button>
@@ -139,26 +159,41 @@ export const ReviewsView: React.FC<ReviewsViewProps> = ({ setActivePage }) => {
 
         {/* Reviews List */}
         <h2 className="text-2xl font-serif mb-6">Recent Guest Comments</h2>
-        <div className="grid grid--3">
-          {reviews.map((rev) => (
-            <article key={rev.id} className="testimonial flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="testimonial__name">{rev.name}</div>
-                  <span className="text-xs text-[#6E6559]">{rev.date}</span>
+        {initialLoading && reviews.length === 0 ? (
+          <div className="grid grid--3">
+            {[1, 2, 3].map((n) => (
+              <article key={n} className="testimonial flex flex-col justify-between animate-pulse">
+                <div className="space-y-3">
+                  <div className="h-5 bg-[#E8DED0] rounded w-1/2" />
+                  <div className="h-3 bg-[#E8DED0]/60 rounded w-1/3" />
+                  <div className="h-4 bg-[#E8DED0]/40 rounded w-1/4" />
+                  <div className="h-16 bg-[#E8DED0]/50 rounded w-full" />
                 </div>
-                <div className="testimonial__trip">{rev.tripType}</div>
-                <div className="testimonial__stars">
-                  {'★'.repeat(rev.rating)}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid--3">
+            {reviews.map((rev) => (
+              <article key={rev.id} className="testimonial flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="testimonial__name">{rev.name}</div>
+                    <span className="text-xs text-[#6E6559]">{rev.date}</span>
+                  </div>
+                  <div className="testimonial__trip">{rev.tripType}</div>
+                  <div className="testimonial__stars">
+                    {'★'.repeat(rev.rating)}
+                  </div>
+                  <p className="mt-3">{rev.comment}</p>
                 </div>
-                <p className="mt-3">{rev.comment}</p>
-              </div>
-            </article>
-          ))}
-        </div>
+              </article>
+            ))}
+          </div>
+        )}
 
         <div className="text-center mt-12">
-          <button onClick={() => setActivePage('book')} className="btn btn--primary btn--lg">
+          <button onClick={handleBookClick} className="btn btn--primary btn--lg">
             Ready for your stay? Book Now &rarr;
           </button>
         </div>

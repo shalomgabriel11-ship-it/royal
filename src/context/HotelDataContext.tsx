@@ -24,6 +24,7 @@ interface HotelDataContextType {
   landmarks: LandmarkItem[];
   settings: Record<string, string>;
   loading: boolean;
+  initialLoading: boolean;
   user: User | null;
   memberProfile: MemberProfile | null;
   isMembershipModalOpen: boolean;
@@ -36,6 +37,7 @@ interface HotelDataContextType {
   refreshReviews: () => Promise<void>;
   refreshOffers: () => Promise<void>;
   refreshGallery: () => Promise<void>;
+  refreshMemberProfile: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 
@@ -47,6 +49,7 @@ const HotelDataContext = createContext<HotelDataContextType>({
   landmarks: LANDMARKS,
   settings: DEFAULT_SETTINGS,
   loading: false,
+  initialLoading: true,
   user: null,
   memberProfile: null,
   isMembershipModalOpen: false,
@@ -59,6 +62,7 @@ const HotelDataContext = createContext<HotelDataContextType>({
   refreshReviews: async () => {},
   refreshOffers: async () => {},
   refreshGallery: async () => {},
+  refreshMemberProfile: async () => {},
   refreshAll: async () => {},
 });
 
@@ -69,6 +73,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [galleryImages, setGalleryImages] = useState<GalleryItem[]>(DEFAULT_GALLERY_IMAGES);
   const [settings, setSettings] = useState<Record<string, string>>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [memberProfile, setMemberProfile] = useState<MemberProfile | null>(null);
   const [isMembershipModalOpen, setIsMembershipModalOpen] = useState(false);
@@ -194,6 +199,12 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
+  const refreshMemberProfile = useCallback(async () => {
+    if (user?.id) {
+      await fetchMemberProfile(user.id);
+    }
+  }, [user?.id, fetchMemberProfile]);
+
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -214,6 +225,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.warn('Error fetching hotel data:', err);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   }, []);
 
@@ -231,6 +243,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         landmarks: LANDMARKS,
         settings,
         loading,
+        initialLoading,
         user,
         memberProfile,
         isMembershipModalOpen,
@@ -243,6 +256,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         refreshReviews,
         refreshOffers,
         refreshGallery,
+        refreshMemberProfile,
         refreshAll
       }}
     >

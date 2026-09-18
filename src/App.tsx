@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { PageView } from './types';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { HotelDataProvider } from './context/HotelDataContext';
@@ -13,89 +13,67 @@ import { StoryView } from './views/StoryView';
 import { ReviewsView } from './views/ReviewsView';
 import { ContactView } from './views/ContactView';
 import { BookView } from './views/BookView';
+import { AccountView } from './views/AccountView';
 import { AdminLoginView } from './views/AdminLoginView';
 import { AdminDashboardView } from './views/AdminDashboardView';
 import { MembershipPopup } from './components/MembershipPopup';
+import { RouteMetadata } from './components/RouteMetadata';
 
-export default function App() {
-  const [activePage, setActivePage] = useState<PageView>('home');
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+function AppContent() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isAdmin = location.pathname.startsWith('/admin');
 
-  useEffect(() => {
-    const onPopState = () => {
-      setCurrentPath(window.location.pathname);
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
-
-  const navigate = (to: string) => {
-    if (to !== window.location.pathname) {
-      window.history.pushState(null, '', to);
-      setCurrentPath(to);
-      window.scrollTo(0, 0);
-    }
-  };
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [activePage, currentPath]);
-
-  // Admin routing check
-  if (currentPath === '/admin/login') {
+  if (location.pathname === '/admin/login') {
     return (
-      <HotelDataProvider>
+      <>
+        <RouteMetadata />
         <AdminLoginView navigate={navigate} />
-      </HotelDataProvider>
+      </>
     );
   }
 
-  if (currentPath.startsWith('/admin')) {
+  if (isAdmin) {
     return (
-      <HotelDataProvider>
+      <>
+        <RouteMetadata />
         <AdminDashboardView navigate={navigate} />
-      </HotelDataProvider>
+      </>
     );
   }
-
-  const renderView = () => {
-    switch (activePage) {
-      case 'home':
-        return <HomeView setActivePage={setActivePage} />;
-      case 'rooms':
-        return <RoomsView setActivePage={setActivePage} />;
-      case 'dining':
-        return <DiningView setActivePage={setActivePage} />;
-      case 'gallery':
-        return <GalleryView setActivePage={setActivePage} />;
-      case 'offers':
-        return <OffersView setActivePage={setActivePage} />;
-      case 'events':
-        return <EventsView setActivePage={setActivePage} />;
-      case 'our-story':
-        return <StoryView setActivePage={setActivePage} />;
-      case 'reviews':
-        return <ReviewsView setActivePage={setActivePage} />;
-      case 'contact':
-        return <ContactView setActivePage={setActivePage} />;
-      case 'book':
-        return <BookView setActivePage={setActivePage} />;
-      default:
-        return <HomeView setActivePage={setActivePage} />;
-    }
-  };
 
   return (
-    <HotelDataProvider>
-      <div className="min-h-screen flex flex-col bg-[#F4EFE6] text-[#2A2620]">
-        <Navbar activePage={activePage} setActivePage={setActivePage} />
-        <main className="flex-1" id="main-content">
-          {renderView()}
-        </main>
-        <Footer setActivePage={setActivePage} />
-        <MembershipPopup />
-      </div>
-    </HotelDataProvider>
+    <div className="min-h-screen flex flex-col bg-[#F4EFE6] text-[#2A2620]">
+      <RouteMetadata />
+      <Navbar />
+      <main className="flex-1" id="main-content">
+        <Routes>
+          <Route path="/" element={<HomeView />} />
+          <Route path="/rooms" element={<RoomsView />} />
+          <Route path="/dining" element={<DiningView />} />
+          <Route path="/gallery" element={<GalleryView />} />
+          <Route path="/offers" element={<OffersView />} />
+          <Route path="/events" element={<EventsView />} />
+          <Route path="/our-story" element={<StoryView />} />
+          <Route path="/reviews" element={<ReviewsView />} />
+          <Route path="/contact" element={<ContactView />} />
+          <Route path="/book" element={<BookView />} />
+          <Route path="/account" element={<AccountView />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+      <Footer />
+      <MembershipPopup />
+    </div>
   );
 }
 
+export default function App() {
+  return (
+    <HotelDataProvider>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </HotelDataProvider>
+  );
+}

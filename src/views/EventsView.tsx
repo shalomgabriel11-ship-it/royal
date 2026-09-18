@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 import { formatWhatsAppUrl, submitEventInquiry } from '../data';
 import { useHotelData } from '../context/HotelDataContext';
 
 interface EventsViewProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
+  const navigate = useNavigate();
   const { galleryImages } = useHotelData();
   const [mediaMode, setMediaMode] = useState<'video' | 'photos'>('video');
   const [conferenceImgIdx, setConferenceImgIdx] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [dbError, setDbError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -22,6 +25,13 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
     date: '',
     notes: ''
   });
+
+  const clearSubmissionState = () => {
+    if (submitted) {
+      setSubmitted(false);
+      setDbError(false);
+    }
+  };
 
   // Extract events images from storage-backed gallery items if available
   const eventPhotos = useMemo(() => {
@@ -40,12 +50,14 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setIsSubmitting(true);
-    setSubmitted(true);
+    let dbSaveOk = false;
 
     // Dual-write: 1. Persist to Supabase
     try {
-      await submitEventInquiry({
+      const res = await submitEventInquiry({
         full_name: formData.name,
         phone: formData.phone,
         event_type: formData.eventType,
@@ -53,15 +65,19 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
         target_date: formData.date || null,
         notes: formData.notes
       });
+      dbSaveOk = Boolean(res?.success);
     } catch (err) {
       console.warn('Supabase event inquiry insert notice:', err);
-    } finally {
-      setIsSubmitting(false);
+      dbSaveOk = false;
     }
 
     // Dual-write: 2. Always open WhatsApp
     const msg = `Hello ROYAL MGWASI HOTEL, I'd like an Event Quote.\nName: ${formData.name}\nPhone: ${formData.phone}\nEvent Type: ${formData.eventType}\nGuests: ${formData.guests}\nTarget Date: ${formData.date}\nNotes: ${formData.notes}`;
     window.open(formatWhatsAppUrl(msg), '_blank');
+
+    setIsSubmitting(false);
+    setSubmitted(true);
+    setDbError(!dbSaveOk);
   };
 
   return (
@@ -224,7 +240,10 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
                   required 
                   placeholder="e.g. Dr. Frank Mwaikenda"
                   value={formData.name}
-                  onChange={e => setFormData({...formData, name: e.target.value})}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setFormData({...formData, name: e.target.value});
+                  }}
                 />
               </div>
               <div className="field">
@@ -234,7 +253,10 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
                   required 
                   placeholder="e.g. +255 762 555 557"
                   value={formData.phone}
-                  onChange={e => setFormData({...formData, phone: e.target.value})}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setFormData({...formData, phone: e.target.value});
+                  }}
                 />
               </div>
             </div>
@@ -244,7 +266,10 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
                 <label>Event Type</label>
                 <select 
                   value={formData.eventType}
-                  onChange={e => setFormData({...formData, eventType: e.target.value})}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setFormData({...formData, eventType: e.target.value});
+                  }}
                 >
                   <option value="Conference / Seminar">Conference / Seminar</option>
                   <option value="Wedding Reception">Wedding Reception</option>
@@ -257,7 +282,10 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
                 <label>Expected Guests</label>
                 <select 
                   value={formData.guests}
-                  onChange={e => setFormData({...formData, guests: e.target.value})}
+                  onChange={e => {
+                    clearSubmissionState();
+                    setFormData({...formData, guests: e.target.value});
+                  }}
                 >
                   <option value="Under 25 Guests">Under 25 Guests</option>
                   <option value="25 - 50 Guests">25 - 50 Guests</option>
@@ -273,7 +301,10 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
               <input 
                 type="date" 
                 value={formData.date}
-                onChange={e => setFormData({...formData, date: e.target.value})}
+                onChange={e => {
+                  clearSubmissionState();
+                  setFormData({...formData, date: e.target.value});
+                }}
               />
             </div>
 
@@ -283,19 +314,42 @@ export const EventsView: React.FC<EventsViewProps> = ({ setActivePage }) => {
                 rows={3} 
                 placeholder="Specify if you require buffet catering, sound equipment, hall decoration, or accommodation for guests."
                 value={formData.notes}
-                onChange={e => setFormData({...formData, notes: e.target.value})}
+                onChange={e => {
+                  clearSubmissionState();
+                  setFormData({...formData, notes: e.target.value});
+                }}
               ></textarea>
             </div>
 
-            {submitted && (
+            {submitted && !dbError && (
               <div className="form-success is-visible my-4">
                 Thank you! Opening WhatsApp with your event details...
               </div>
             )}
 
+            {submitted && dbError && (
+              <div className="p-3.5 my-4 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs sm:text-sm font-medium leading-relaxed">
+                We've opened WhatsApp with your event inquiry, but our online database backup couldn't be saved. Please double check that your message sends on WhatsApp — if WhatsApp did not open, please call or message us directly at +255 762 555 557.
+              </div>
+            )}
+
             <div className="mt-6">
-              <button type="submit" className="btn btn--primary btn--block btn--lg">
-                Submit &amp; Get Quote on WhatsApp
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="btn btn--primary btn--block btn--lg disabled:opacity-75 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span>Opening WhatsApp...</span>
+                  </span>
+                ) : (
+                  'Submit & Get Quote on WhatsApp'
+                )}
               </button>
             </div>
           </form>

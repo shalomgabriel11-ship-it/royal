@@ -1,12 +1,19 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 import { formatWhatsAppUrl } from '../data';
 
 interface DiningViewProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 export const DiningView: React.FC<DiningViewProps> = ({ setActivePage }) => {
+  const navigate = useNavigate();
+
+  const handleBookClick = () => {
+    if (setActivePage) setActivePage('book');
+    navigate('/book');
+  };
   return (
     <div className="section">
       <div className="container">
@@ -121,7 +128,7 @@ export const DiningView: React.FC<DiningViewProps> = ({ setActivePage }) => {
             <p className="text-white text-base">Halal-friendly kitchen &amp; 24/7 Room Service available.</p>
             <p className="text-sm text-[#B9B2A5] mt-1">Prefer to dine in your room? We deliver fresh hot meals right to your door.</p>
           </div>
-          <button onClick={() => setActivePage('book')} className="btn btn--primary">
+          <button onClick={handleBookClick} className="btn btn--primary">
             Book Stay &amp; Meals
           </button>
         </div>

@@ -1,18 +1,25 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 import { formatWhatsAppUrl } from '../data';
 import { RoomCardMedia } from '../components/RoomCardMedia';
 import { useHotelData } from '../context/HotelDataContext';
 
 interface HomeViewProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
-  const { rooms, reviews, landmarks } = useHotelData();
+  const navigate = useNavigate();
+  const { rooms, reviews, landmarks, initialLoading } = useHotelData();
   const trackRef = useRef<HTMLDivElement>(null);
   const [isPrevDisabled, setIsPrevDisabled] = useState(true);
   const [isNextDisabled, setIsNextDisabled] = useState(false);
+
+  const goTo = (page: PageView) => {
+    if (setActivePage) setActivePage(page);
+    navigate(page === 'home' ? '/' : `/${page}`);
+  };
 
   // Calculate scroll distance: one full card width + track gap
   const getScrollAmount = useCallback(() => {
@@ -96,7 +103,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
                   </svg> 
                   WhatsApp us
                 </a>
-                <button onClick={() => setActivePage('rooms')} className="btn btn--secondary btn--lg">
+                <button onClick={() => goTo('rooms')} className="btn btn--secondary btn--lg">
                   View rooms
                 </button>
               </div>
@@ -151,7 +158,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
               <span className="eyebrow">Stay your way</span>
               <h2>Rooms made for proper rest.</h2>
             </div>
-            <button onClick={() => setActivePage('rooms')} className="btn btn--secondary">
+            <button onClick={() => goTo('rooms')} className="btn btn--secondary">
               See all rooms
             </button>
           </div>
@@ -211,26 +218,40 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
               role="region"
               aria-label="Featured rooms"
             >
-              {rooms.map((room) => (
-                <article key={room.id} className="room-card rooms-scroller__card">
-                  <RoomCardMedia room={room} />
-                  <div className="room-card__body">
-                    <h3>{room.name}</h3>
-                    <p className="room-card__tags">{room.tags.join(' · ')}</p>
-                    <p className="room-card__desc">{room.description}</p>
-                    <div className="room-card__foot">
-                      <a 
-                        href={formatWhatsAppUrl(`Hello ROYAL MGWASI HOTEL, I'd like to ask about the ${room.name}.`)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn--primary btn--block"
-                      >
-                        Ask about {room.name.split(' ')[0]}
-                      </a>
+              {initialLoading && rooms.length === 0 ? (
+                [1, 2, 3].map((n) => (
+                  <article key={n} className="room-card rooms-scroller__card animate-pulse">
+                    <div className="room-card__media bg-[#E8DED0] h-[220px]" />
+                    <div className="room-card__body space-y-3">
+                      <div className="h-6 bg-[#E8DED0] rounded w-3/4" />
+                      <div className="h-4 bg-[#E8DED0]/60 rounded w-1/2" />
+                      <div className="h-12 bg-[#E8DED0]/40 rounded w-full" />
+                      <div className="h-10 bg-[#E8DED0] rounded w-full mt-4" />
                     </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                ))
+              ) : (
+                rooms.map((room) => (
+                  <article key={room.id} className="room-card rooms-scroller__card">
+                    <RoomCardMedia room={room} />
+                    <div className="room-card__body">
+                      <h3>{room.name}</h3>
+                      <p className="room-card__tags">{room.tags.join(' · ')}</p>
+                      <p className="room-card__desc">{room.description}</p>
+                      <div className="room-card__foot">
+                        <a 
+                          href={formatWhatsAppUrl(`Hello ROYAL MGWASI HOTEL, I'd like to ask about the ${room.name}.`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn--primary btn--block"
+                        >
+                          Ask about {room.name.split(' ')[0]}
+                        </a>
+                      </div>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -246,7 +267,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
           <div className="hub-panel">
             <div className="hub-panel__head">
               <h3>Dining at ROYAL MGWASI HOTEL</h3>
-              <button onClick={() => setActivePage('dining')} className="link-arrow">
+              <button onClick={() => goTo('dining')} className="link-arrow">
                 More dining details 
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 7h10M8 3l4 4-4 4"/>
@@ -269,7 +290,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
           <div className="hub-panel tan">
             <div className="hub-panel__head">
               <h3>Amenities at ROYAL MGWASI HOTEL</h3>
-              <button onClick={() => setActivePage('dining')} className="link-arrow">
+              <button onClick={() => goTo('dining')} className="link-arrow">
                 More amenities details 
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 7h10M8 3l4 4-4 4"/>
@@ -298,7 +319,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
           </div>
 
           <div className="grid grid--3 mt-24">
-            <div onClick={() => setActivePage('gallery')} className="link-card">
+            <div onClick={() => goTo('gallery')} className="link-card">
               <h3>Gallery</h3>
               <p>Honest photography of rooms, dining and shared spaces.</p>
               <span className="link-arrow">
@@ -306,7 +327,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
               </span>
             </div>
-            <div onClick={() => setActivePage('our-story')} className="link-card">
+            <div onClick={() => goTo('our-story')} className="link-card">
               <h3>Our Story</h3>
               <p>Meet the people and purpose behind your stay in Mbeya.</p>
               <span className="link-arrow">
@@ -314,7 +335,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
               </span>
             </div>
-            <div onClick={() => setActivePage('reviews')} className="link-card">
+            <div onClick={() => goTo('reviews')} className="link-card">
               <h3>Guest Reviews</h3>
               <p>Read real guest feedback from Google reviews and past stays.</p>
               <span className="link-arrow">
@@ -322,7 +343,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
               </span>
             </div>
-            <div onClick={() => setActivePage('book')} className="link-card green">
+            <div onClick={() => goTo('book')} className="link-card green">
               <h3>Book Your Stay</h3>
               <p>Send your dates and get a direct response in 15 minutes.</p>
               <span className="link-arrow">
@@ -330,7 +351,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
               </span>
             </div>
-            <div onClick={() => setActivePage('offers')} className="link-card">
+            <div onClick={() => goTo('offers')} className="link-card">
               <h3>Offers &amp; Packages</h3>
               <p>Weekend escape, corporate delegate, and long-stay plans.</p>
               <span className="link-arrow">
@@ -338,7 +359,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
               </span>
             </div>
-            <div onClick={() => setActivePage('events')} className="link-card">
+            <div onClick={() => goTo('events')} className="link-card">
               <h3>Events &amp; Weddings</h3>
               <p>Conference hall, outdoor garden lawn, and banquet quotes.</p>
               <span className="link-arrow">
@@ -351,7 +372,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
           <div className="hub-panel">
             <div className="hub-panel__head">
               <h3>Location &amp; Contact</h3>
-              <button onClick={() => setActivePage('contact')} className="link-arrow">
+              <button onClick={() => goTo('contact')} className="link-arrow">
                 Plan your arrival 
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
               </button>
@@ -389,7 +410,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
                     </li>
                   ))}
                 </ul>
-                <button onClick={() => setActivePage('contact')} className="link-arrow mt-16" style={{ display: 'inline-flex' }}>
+                <button onClick={() => goTo('contact')} className="link-arrow mt-16" style={{ display: 'inline-flex' }}>
                   Open map for live travel times 
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
                 </button>
@@ -454,7 +475,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
             ))}
           </div>
           <div className="text-center mt-32">
-            <button onClick={() => setActivePage('reviews')} className="btn btn--secondary">
+            <button onClick={() => goTo('reviews')} className="btn btn--secondary">
               Read all reviews
             </button>
           </div>

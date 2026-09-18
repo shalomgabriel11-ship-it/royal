@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 import { useHotelData } from '../context/HotelDataContext';
 
 interface GalleryViewProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 interface VideoItem {
@@ -67,8 +68,14 @@ const HOTEL_VIDEOS: VideoItem[] = [
 ];
 
 export const GalleryView: React.FC<GalleryViewProps> = ({ setActivePage }) => {
-  const { galleryImages } = useHotelData();
+  const navigate = useNavigate();
+  const { galleryImages, initialLoading } = useHotelData();
   const [activeTab, setActiveTab] = useState<string>('All');
+
+  const handleBookClick = () => {
+    if (setActivePage) setActivePage('book');
+    navigate('/book');
+  };
 
   const categories = ['All', 'Videos', 'Rooms', 'Dining', 'Pool', 'Grounds', 'Events'];
 
@@ -149,26 +156,34 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ setActivePage }) => {
         )}
 
         {/* Gallery Grid */}
-        <div className="grid grid--3">
-          {filteredImages.map((img) => (
-            <div key={img.id} className={`ph ${img.colorClass} min-h-[260px] relative overflow-hidden group`}>
-              {img.image && (
-                <img 
-                  src={img.image} 
-                  alt={img.title} 
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent pointer-events-none z-[1]" />
-              <div className="ph__label z-[2] relative">
-                {img.title}
-                <small>Category: {img.category} &middot; Royal Mgwasi Hotel</small>
+        {initialLoading && filteredImages.length === 0 && activeTab !== 'Videos' ? (
+          <div className="grid grid--3">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div key={n} className="min-h-[260px] rounded-xl bg-[#E8DED0]/60 animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid--3">
+            {filteredImages.map((img) => (
+              <div key={img.id} className={`ph ${img.colorClass} min-h-[260px] relative overflow-hidden group`}>
+                {img.image && (
+                  <img 
+                    src={img.image} 
+                    alt={img.title} 
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent pointer-events-none z-[1]" />
+                <div className="ph__label z-[2] relative">
+                  {img.title}
+                  <small>Category: {img.category} &middot; Royal Mgwasi Hotel</small>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="note-card mt-12 text-center">
           <h4>Want to see a live video tour before booking?</h4>
@@ -176,7 +191,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ setActivePage }) => {
             Our reception team can send you video walk-throughs of our current rooms on WhatsApp.
           </p>
           <div className="mt-6">
-            <button onClick={() => setActivePage('book')} className="btn btn--primary">
+            <button onClick={handleBookClick} className="btn btn--primary">
               Book Your Visit
             </button>
           </div>

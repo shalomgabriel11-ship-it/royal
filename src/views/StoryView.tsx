@@ -1,11 +1,19 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 
 interface StoryViewProps {
-  setActivePage: (page: PageView) => void;
+  setActivePage?: (page: PageView) => void;
 }
 
 export const StoryView: React.FC<StoryViewProps> = ({ setActivePage }) => {
+  const navigate = useNavigate();
+
+  const handleBookClick = () => {
+    if (setActivePage) setActivePage('book');
+    navigate('/book');
+  };
+
   return (
     <div className="section">
       <div className="container">
@@ -59,7 +67,7 @@ export const StoryView: React.FC<StoryViewProps> = ({ setActivePage }) => {
         </div>
 
         <div className="text-center mt-12">
-          <button onClick={() => setActivePage('book')} className="btn btn--primary btn--lg">
+          <button onClick={handleBookClick} className="btn btn--primary btn--lg">
             Experience Our Hospitality &rarr;
           </button>
         </div>
