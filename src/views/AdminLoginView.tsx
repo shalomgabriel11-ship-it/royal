@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { checkUserIsAdmin } from '../lib/authUtils';
 import { Shield, Lock, Mail, Eye, EyeOff, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
 
 interface AdminLoginViewProps {
@@ -14,7 +15,7 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ navigate }) => {
   const [checkingSession, setCheckingSession] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Check if already signed in with a valid profiles row
+  // Check if already signed in with admin access
   useEffect(() => {
     let isMounted = true;
     const checkExistingSession = async () => {
@@ -23,14 +24,8 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ navigate }) => {
         const user = sessionData?.session?.user;
 
         if (user) {
-          // Check if user has a profile with staff/admin role
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (!error && profile) {
+          const adminCheck = await checkUserIsAdmin(user);
+          if (adminCheck.isAdmin) {
             if (isMounted) {
               navigate('/admin');
               return;
@@ -75,17 +70,13 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({ navigate }) => {
       const user = authData.user;
 
       // 2. CRITICAL ACCESS CONTROL GATE:
-      // Query profiles table. Only accounts with a matching profiles row have admin dashboard access.
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, full_name')
-        .eq('id', user.id)
-        .maybeSingle();
+      // Verify user has admin/staff role
+      const adminCheck = await checkUserIsAdmin(user);
 
-      if (profileError || !profile) {
+      if (!adminCheck.isAdmin) {
         // Sign back out immediately to revoke session
         await supabase.auth.signOut();
-        throw new Error('This account does not have admin access.');
+        throw new Error('This account does not have management/admin privileges.');
       }
 
       // 3. User verified as hotel staff/admin - proceed to dashboard

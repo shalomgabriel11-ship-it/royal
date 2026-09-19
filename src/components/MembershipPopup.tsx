@@ -21,6 +21,8 @@ export const MembershipPopup: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
 
@@ -76,6 +78,7 @@ export const MembershipPopup: React.FC = () => {
     setIsVisible(false);
     setAuthError(null);
     setAuthNotice(null);
+    setResendStatus(null);
     closeMembershipModal(7);
     try {
       localStorage.setItem(STORAGE_KEY, Date.now().toString());
@@ -103,12 +106,38 @@ export const MembershipPopup: React.FC = () => {
     }
   };
 
+  const handleResendConfirmation = async () => {
+    if (!email.trim()) {
+      setAuthError('Please enter your email address above to resend the confirmation link.');
+      return;
+    }
+    setIsResending(true);
+    setResendStatus(null);
+    setAuthError(null);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim(),
+      });
+      if (error) {
+        setAuthError(error.message);
+      } else {
+        setResendStatus('Confirmation link resent! Please check your inbox and spam folder.');
+      }
+    } catch (err: any) {
+      setAuthError(err?.message || 'Could not resend confirmation email.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleEmailAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmittingEmail) return;
 
     setAuthError(null);
     setAuthNotice(null);
+    setResendStatus(null);
     setIsSubmittingEmail(true);
 
     try {
@@ -132,19 +161,25 @@ export const MembershipPopup: React.FC = () => {
 
         if (error) {
           setAuthError(error.message);
+        } else if (data?.user?.identities && data.user.identities.length === 0) {
+          setAuthError('An account with this email already exists. Click "Already a member? Sign in" below to log in.');
         } else if (data?.user && !data?.session) {
-          setAuthNotice('Check your email to confirm your account before signing in.');
+          setAuthNotice('Check your email to confirm your account before signing in. If you do not see the email, please check your spam folder.');
         } else {
           handleDismiss();
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data: signInData, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         });
 
         if (error) {
-          setAuthError(error.message);
+          if (error.message.toLowerCase().includes('email not confirmed')) {
+            setAuthError('Your email address has not been confirmed yet. Please check your inbox or spam folder for the verification link from Supabase.');
+          } else {
+            setAuthError(error.message);
+          }
         } else {
           handleDismiss();
         }
@@ -350,14 +385,42 @@ export const MembershipPopup: React.FC = () => {
             </div>
 
             {authError && (
-              <p className="text-xs text-[#8B261E] font-semibold mt-1.5">
-                {authError}
-              </p>
+              <div className="mt-2 space-y-1.5">
+                <p className="text-xs text-[#8B261E] font-semibold">
+                  {authError}
+                </p>
+                {authError.toLowerCase().includes('confirmed') && email && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={isResending}
+                    className="text-xs text-[#1D5D4C] hover:underline font-medium block"
+                  >
+                    {isResending ? 'Resending email...' : 'Resend confirmation email'}
+                  </button>
+                )}
+              </div>
             )}
 
             {authNotice && (
+              <div className="p-3 my-2 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-medium leading-relaxed space-y-2">
+                <p>{authNotice}</p>
+                {email && (
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={isResending}
+                    className="text-xs text-[#1D5D4C] underline font-semibold block hover:text-[#164B3D]"
+                  >
+                    {isResending ? 'Resending email...' : "Didn't receive it? Click to resend confirmation email"}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {resendStatus && (
               <div className="p-3 my-2 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-medium leading-relaxed">
-                {authNotice}
+                {resendStatus}
               </div>
             )}
 

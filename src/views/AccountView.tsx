@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useHotelData } from '../context/HotelDataContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { BookingStatus, BookingRow } from '../components/admin/AdminBookingsSection';
@@ -15,8 +15,14 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; b
 };
 
 export const AccountView: React.FC = () => {
-  const navigate = useNavigate();
-  const { user, memberProfile, initialLoading, refreshMemberProfile, rooms } = useHotelData();
+  const { 
+    user, 
+    memberProfile, 
+    initialLoading, 
+    refreshMemberProfile, 
+    rooms, 
+    signInWithGoogle 
+  } = useHotelData();
 
   // Profile form state
   const [fullName, setFullName] = useState('');
@@ -24,6 +30,12 @@ export const AccountView: React.FC = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Direct login form state (for visitors on /account)
+  const [accountEmail, setAccountEmail] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Bookings state
   const [bookings, setBookings] = useState<BookingRow[]>([]);
@@ -33,18 +45,32 @@ export const AccountView: React.FC = () => {
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
 
-  // Redirect signed-out visitors to home
-  useEffect(() => {
-    if (!initialLoading && !user) {
-      navigate('/', { replace: true });
+  // Handle direct login from /account page
+  const handleDirectAccountLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setIsLoggingIn(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: accountEmail.trim(),
+        password: accountPassword
+      });
+
+      if (error) {
+        setLoginError(error.message);
+      }
+    } catch (err: any) {
+      setLoginError(err?.message || 'Failed to sign in');
+    } finally {
+      setIsLoggingIn(false);
     }
-  }, [user, initialLoading, navigate]);
+  };
 
   // Sync profile fields with state
   useEffect(() => {
     if (user) {
       setFullName(memberProfile?.full_name || (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || '');
-      setPhone(memberProfile?.phone || '');
+      setPhone(memberProfile?.phone || (user.user_metadata?.phone as string) || '');
     }
   }, [user, memberProfile]);
 
@@ -124,38 +150,75 @@ export const AccountView: React.FC = () => {
 
     try {
       const avatarUrl = memberProfile?.avatar_url || (user.user_metadata?.avatar_url as string) || (user.user_metadata?.picture as string) || null;
+      const profileDataWithPhone = {
+        full_name: fullName.trim() || null,
+        phone: phone.trim() || null,
+        email: user.email,
+        avatar_url: avatarUrl
+      };
+      const profileDataNoPhone = {
+        full_name: fullName.trim() || null,
+        email: user.email,
+        avatar_url: avatarUrl
+      };
 
-      // Upsert into members table
-      const { error } = await supabase
-        .from('members')
-        .upsert({
-          id: user.id,
-          full_name: fullName.trim() || null,
-          phone: phone.trim() || null,
-          email: user.email,
-          avatar_url: avatarUrl
-        }, { onConflict: 'id' });
+      // 1. Update Supabase Auth user metadata (always succeeds for authenticated user)
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            full_name: fullName.trim(),
+            name: fullName.trim(),
+            phone: phone.trim(),
+          }
+        });
+      } catch (authErr) {
+        console.warn('Could not update auth user_metadata:', authErr);
+      }
 
-      if (error) {
-        // If phone column is not in members schema, fallback to full_name only
-        if (error.code === '42703' || error.message.includes('phone')) {
-          const { error: fallbackError } = await supabase
+      // 2. Try update first if member profile already exists in members table
+      let saveError: any = null;
+      if (memberProfile) {
+        let res = await supabase
+          .from('members')
+          .update(profileDataWithPhone)
+          .eq('id', user.id);
+        
+        if (res.error && (res.error.code === '42703' || res.error.message.includes('phone'))) {
+          res = await supabase
+            .from('members')
+            .update(profileDataNoPhone)
+            .eq('id', user.id);
+        }
+        saveError = res.error;
+      }
+
+      // If no memberProfile yet or update couldn't find row, do upsert
+      if (!memberProfile || (saveError && !saveError.message.includes('policy'))) {
+        let res = await supabase
+          .from('members')
+          .upsert({
+            id: user.id,
+            ...profileDataWithPhone
+          }, { onConflict: 'id' });
+
+        if (res.error && (res.error.code === '42703' || res.error.message.includes('phone'))) {
+          res = await supabase
             .from('members')
             .upsert({
               id: user.id,
-              full_name: fullName.trim() || null,
-              email: user.email,
-              avatar_url: avatarUrl
+              ...profileDataNoPhone
             }, { onConflict: 'id' });
-
-          if (fallbackError) {
-            setProfileError(fallbackError.message);
-            return;
-          }
-        } else {
-          setProfileError(error.message);
-          return;
         }
+        saveError = res.error;
+      }
+
+      if (saveError) {
+        if (saveError.code === '42501' || saveError.message.includes('policy')) {
+          setProfileError('Database policy error: public.members is missing an RLS policy for insert/update. Please run the provided SQL in Supabase SQL Editor.');
+        } else {
+          setProfileError(saveError.message);
+        }
+        return;
       }
 
       await refreshMemberProfile();
@@ -168,12 +231,113 @@ export const AccountView: React.FC = () => {
     }
   };
 
-  if (initialLoading || !user) {
+  // 1. Initial Auth verification loading
+  if (initialLoading) {
     return (
       <div className="section min-h-[60vh] flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-8 h-8 border-3 border-[#1D5D4C] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm font-semibold text-[#6E6559]">Loading member account...</p>
+          <p className="text-sm font-semibold text-[#6E6559]">Loading account...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. If visitor is NOT logged in, show dedicated sign-in card
+  if (!user) {
+    return (
+      <div className="section min-h-[75vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-[#FAF7F2] rounded-2xl p-8 border border-[#DCD3C1] shadow-xl">
+          <div className="text-center mb-6">
+            <span className="eyebrow">Royal Mgwasi Hotel</span>
+            <h2 className="text-2xl font-serif font-bold text-[#2A2620] mt-1 mb-2">
+              Sign In to Your Account
+            </h2>
+            <p className="text-xs text-[#6E6559]">
+              Enter your credentials to access your Member Account.
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
+              <svg className="w-4 h-4 shrink-0 text-red-500 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleDirectAccountLogin} className="space-y-4">
+            <div className="field">
+              <label>Email Address</label>
+              <input
+                type="email"
+                required
+                value={accountEmail}
+                onChange={e => setAccountEmail(e.target.value)}
+                placeholder="e.g. name@example.com"
+                className="w-full"
+              />
+            </div>
+
+            <div className="field">
+              <label>Password</label>
+              <input
+                type="password"
+                required
+                value={accountPassword}
+                onChange={e => setAccountPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoggingIn}
+              className="btn btn--primary w-full py-3 inline-flex items-center justify-center gap-2"
+            >
+              {isLoggingIn ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Signing In...</span>
+                </>
+              ) : (
+                <span>Sign In</span>
+              )}
+            </button>
+          </form>
+
+          <div className="relative my-6 text-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#DCD3C1]" />
+            </div>
+            <span className="relative px-3 bg-[#FAF7F2] text-[11px] font-semibold text-[#8C8275] uppercase tracking-wider">
+              Or continue with
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={signInWithGoogle}
+            className="w-full py-2.5 px-4 rounded-xl border border-[#DCD3C1] bg-white hover:bg-[#F4EFE6] text-xs font-semibold text-[#2A2620] transition-colors flex items-center justify-center gap-2.5 shadow-xs"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+            </svg>
+            <span>Google Account</span>
+          </button>
+
+          <div className="mt-6 pt-4 border-t border-[#E8DED0] text-center">
+            <Link to="/" className="text-xs text-[#6E6559] hover:text-[#1D5D4C] transition-colors">
+              ← Return to Hotel Website
+            </Link>
+          </div>
         </div>
       </div>
     );

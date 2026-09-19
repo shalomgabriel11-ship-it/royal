@@ -100,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activePage, setActivePage }) => 
             <div className="header-cta flex items-center gap-3">
               {/* Member Status / Sign-in */}
               {user ? (
-                <div className="relative" ref={userMenuRef}>
+                <div className="relative flex items-center gap-2" ref={userMenuRef}>
                   <button 
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                     className="flex items-center gap-2 py-1.5 px-3 rounded-full bg-[#EFE8D9] hover:bg-[#E8DED0] border border-[#DCD3C1] text-xs font-semibold text-[#2A2620] transition-colors focus:outline-none shadow-sm"
@@ -127,12 +127,14 @@ export const Navbar: React.FC<NavbarProps> = ({ activePage, setActivePage }) => 
 
                   {/* Dropdown menu */}
                   {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-60 bg-[#FAF7F2] rounded-xl shadow-xl border border-[#DCD3C1] py-2 z-50 animate-fadeIn">
+                    <div className="absolute right-0 mt-2 top-full w-64 bg-[#FAF7F2] rounded-xl shadow-xl border border-[#DCD3C1] py-2 z-50 animate-fadeIn">
                       <div className="px-4 py-2.5 border-b border-[#E8DED0]">
                         <p className="text-xs font-bold text-[#2A2620] truncate">{fullName}</p>
                         <p className="text-[11px] text-[#6E6559] truncate">{user.email}</p>
-                        <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#1D5D4C]/10 text-[#1D5D4C] text-[10px] font-bold uppercase tracking-wider">
-                          <span>★</span> Royal Member
+                        <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#1D5D4C]/10 text-[#1D5D4C] text-[10px] font-bold uppercase tracking-wider">
+                            ★ Royal Member
+                          </span>
                         </div>
                       </div>
                       <div className="pt-1">
@@ -244,6 +246,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activePage, setActivePage }) => 
                 </div>
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => {

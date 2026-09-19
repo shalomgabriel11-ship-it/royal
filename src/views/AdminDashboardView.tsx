@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { checkUserIsAdmin } from '../lib/authUtils';
 import { 
   CalendarCheck, 
   Mail, 
@@ -71,16 +72,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ navigate
           return;
         }
 
-        // Must exist in profiles table
-        const { data: profileRow, error: profileErr } = await supabase
-          .from('profiles')
-          .select('id, role, full_name')
-          .eq('id', user.id)
-          .maybeSingle();
+        // Verify admin role via profiles, metadata, or registered admin email
+        const adminCheck = await checkUserIsAdmin(user);
 
-        if (profileErr || !profileRow) {
-          // Unauthorized: Sign out and redirect to staff login
-          await supabase.auth.signOut();
+        if (!adminCheck.isAdmin) {
+          // Unauthorized: Redirect to login or home
           if (isMounted) navigate('/admin/login');
           return;
         }
@@ -89,8 +85,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ navigate
           setProfile({
             id: user.id,
             email: user.email || '',
-            role: profileRow.role || 'staff',
-            fullName: profileRow.full_name || 'Hotel Staff'
+            role: adminCheck.role || 'admin',
+            fullName: adminCheck.profile?.full_name || (user.user_metadata?.full_name as string) || 'Hotel Staff'
           });
         }
 
