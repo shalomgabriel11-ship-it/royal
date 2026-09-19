@@ -20,7 +20,7 @@ export interface GalleryItemRow {
   title: string;
   category: string;
   storage_path: string;
-  color_fallback?: string | null;
+  color_class?: string | null;
   sort_order: number;
   is_published: boolean;
 }
@@ -153,7 +153,7 @@ export const AdminGallerySection: React.FC = () => {
           title: newTitle.trim(),
           category: newCategory,
           storage_path: storagePath,
-          color_fallback: '#1D5D4C',
+          color_class: 'ph--forest',
           sort_order: nextOrder,
           is_published: true
         })
@@ -189,7 +189,7 @@ export const AdminGallerySection: React.FC = () => {
           title: item.title,
           category: item.category,
           storage_path: item.storage_path || `default/gallery_${i + 1}.jpg`,
-          color_fallback: item.colorClass || '#1D5D4C',
+          color_class: item.colorClass || 'ph--forest',
           sort_order: i + 1,
           is_published: true
         });
@@ -318,8 +318,8 @@ export const AdminGallerySection: React.FC = () => {
                     />
                   ) : (
                     <div 
-                      className="w-full h-full flex items-center justify-center text-white text-xs font-semibold"
-                      style={{ backgroundColor: item.color_fallback || '#1D5D4C' }}
+                      className={`w-full h-full flex items-center justify-center text-white text-xs font-semibold ph ${item.color_class || 'ph--forest'}`}
+                      style={item.color_class && !item.color_class.startsWith('ph--') ? { backgroundColor: item.color_class } : undefined}
                     >
                       {item.title}
                     </div>
