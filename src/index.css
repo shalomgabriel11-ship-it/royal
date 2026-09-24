@@ -391,8 +391,45 @@ h4, .h4{
 .hero__image .ph__label{ position:absolute; inset:auto 20px 20px 20px; padding:0; z-index:2; }
 
 /* =========================================================
-   HERO IMAGE SLIDESHOW (Ken Burns + Pure CSS Crossfade)
+   HERO IMAGE SLIDESHOW (Dynamic Ken Burns + Crossfade)
    ========================================================= */
+.hero__slide-dynamic {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transform: scale(1);
+  transform-origin: center center;
+  will-change: transform, opacity;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 1200ms ease-in-out, transform 6500ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.hero__slide-dynamic.is-active {
+  opacity: 1;
+  transform: scale(1.14);
+  z-index: 2;
+}
+
+.hero__slide-dynamic.is-prev {
+  opacity: 0;
+  transform: scale(1.16);
+  z-index: 1;
+  transition: opacity 1200ms ease-in-out, transform 1200ms ease-out;
+}
+
+.hero__slide-dynamic.is-single {
+  opacity: 1;
+  transform: scale(1.04);
+  transition: none;
+  z-index: 2;
+}
+
 .hero__slide {
   position: absolute;
   inset: 0;
@@ -407,50 +444,11 @@ h4, .h4{
   will-change: transform, opacity;
   pointer-events: none;
   z-index: 1;
-
-  /* 18s total cycle: 6s per slide */
-  animation: heroKenBurns 18s infinite ease-in-out;
 }
 
-.hero__slide--1 {
-  background-image: url('https://lh3.googleusercontent.com/d/1Jn2e24hAN8qEF5Ik348rieIR-Wj9keZK');
-  animation-delay: 0s;
-}
-
-.hero__slide--2 {
-  background-image: url('https://lh3.googleusercontent.com/d/1_INIP8HkvRd6dIm6WJdtKFvYGNrtynsN');
-  animation-delay: 6s;
-}
-
-.hero__slide--3 {
-  background-image: url('https://lh3.googleusercontent.com/d/1i5yrXWCKFGB5I9U-11961OklvOMfUa2F');
-  animation-delay: 12s;
-}
-
-.hero__image > *:not(.hero__slide) {
+.hero__image > *:not(.hero__slide):not(.hero__slide-dynamic) {
   position: relative;
-  z-index: 2;
-}
-
-@keyframes heroKenBurns {
-  0% {
-    opacity: 0;
-    transform: scale(1);
-  }
-  5.55% {
-    opacity: 1;
-  }
-  33.33% {
-    opacity: 1;
-  }
-  38.88% {
-    opacity: 0;
-    transform: scale(1.14);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1);
-  }
+  z-index: 3;
 }
 
 @media (max-width: 880px){

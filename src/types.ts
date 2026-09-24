@@ -58,6 +58,27 @@ export interface MemberProfile {
   is_active?: boolean;
 }
 
+export interface HeroSlide {
+  id: string;
+  storage_path: string;
+  description?: string | null;
+  sort_order: number;
+  is_active: boolean;
+  image_url?: string;
+  created_at?: string;
+}
+
+export interface GalleryItemImage {
+  id: string;
+  gallery_item_id: string;
+  storage_path: string;
+  description?: string | null;
+  sort_order: number;
+  is_cover: boolean;
+  image_url?: string;
+  created_at?: string;
+}
+
 export interface GalleryItem {
   id: string;
   title: string;
@@ -65,6 +86,9 @@ export interface GalleryItem {
   colorClass: string;
   storage_path?: string | null;
   image?: string;
+  images?: string[];
+  gallery_images?: GalleryItemImage[];
+  is_published?: boolean;
 }
 
 export interface LandmarkItem {

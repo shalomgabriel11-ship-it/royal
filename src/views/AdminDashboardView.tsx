@@ -8,6 +8,7 @@ import {
   Tag, 
   BedDouble, 
   Image as ImageIcon, 
+  Film,
   Settings, 
   LogOut, 
   ExternalLink, 
@@ -25,6 +26,7 @@ import { AdminReviewsSection } from '../components/admin/AdminReviewsSection';
 import { AdminOffersSection } from '../components/admin/AdminOffersSection';
 import { AdminRoomsSection } from '../components/admin/AdminRoomsSection';
 import { AdminGallerySection } from '../components/admin/AdminGallerySection';
+import { AdminHeroSection } from '../components/admin/AdminHeroSection';
 import { AdminSettingsSection } from '../components/admin/AdminSettingsSection';
 
 export type AdminSection = 
@@ -34,6 +36,7 @@ export type AdminSection =
   | 'offers' 
   | 'rooms' 
   | 'gallery' 
+  | 'hero'
   | 'settings';
 
 interface AdminDashboardViewProps {
@@ -177,6 +180,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ navigate
       icon: ImageIcon,
     },
     {
+      id: 'hero' as AdminSection,
+      label: 'Hero Slideshow',
+      icon: Film,
+    },
+    {
       id: 'settings' as AdminSection,
       label: 'Site Settings',
       icon: Settings,
@@ -299,6 +307,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ navigate
         {currentSection === 'offers' && <AdminOffersSection />}
         {currentSection === 'rooms' && <AdminRoomsSection />}
         {currentSection === 'gallery' && <AdminGallerySection />}
+        {currentSection === 'hero' && <AdminHeroSection />}
         {currentSection === 'settings' && <AdminSettingsSection />}
       </main>
     </div>

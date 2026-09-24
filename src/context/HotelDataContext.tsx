@@ -1,18 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
-import { RoomOption, ReviewItem, OfferItem, GalleryItem, LandmarkItem, MemberProfile } from '../types';
+import { RoomOption, ReviewItem, OfferItem, GalleryItem, LandmarkItem, MemberProfile, HeroSlide } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { 
   DEFAULT_ROOMS, 
   DEFAULT_REVIEWS, 
   DEFAULT_OFFERS, 
   DEFAULT_GALLERY_IMAGES, 
+  DEFAULT_HERO_SLIDES,
   DEFAULT_SETTINGS,
   LANDMARKS,
   fetchRooms, 
   fetchReviews, 
   fetchOffers, 
   fetchGallery, 
+  fetchHeroSlides,
   fetchSiteSettings 
 } from '../data';
 
@@ -21,6 +23,7 @@ interface HotelDataContextType {
   reviews: ReviewItem[];
   offers: OfferItem[];
   galleryImages: GalleryItem[];
+  heroSlides: HeroSlide[];
   landmarks: LandmarkItem[];
   settings: Record<string, string>;
   loading: boolean;
@@ -37,6 +40,7 @@ interface HotelDataContextType {
   refreshReviews: () => Promise<void>;
   refreshOffers: () => Promise<void>;
   refreshGallery: () => Promise<void>;
+  refreshHeroSlides: () => Promise<void>;
   refreshMemberProfile: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
@@ -46,6 +50,7 @@ const HotelDataContext = createContext<HotelDataContextType>({
   reviews: DEFAULT_REVIEWS,
   offers: DEFAULT_OFFERS,
   galleryImages: DEFAULT_GALLERY_IMAGES,
+  heroSlides: DEFAULT_HERO_SLIDES,
   landmarks: LANDMARKS,
   settings: DEFAULT_SETTINGS,
   loading: false,
@@ -62,6 +67,7 @@ const HotelDataContext = createContext<HotelDataContextType>({
   refreshReviews: async () => {},
   refreshOffers: async () => {},
   refreshGallery: async () => {},
+  refreshHeroSlides: async () => {},
   refreshMemberProfile: async () => {},
   refreshAll: async () => {},
 });
@@ -71,6 +77,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [reviews, setReviews] = useState<ReviewItem[]>(DEFAULT_REVIEWS);
   const [offers, setOffers] = useState<OfferItem[]>(DEFAULT_OFFERS);
   const [galleryImages, setGalleryImages] = useState<GalleryItem[]>(DEFAULT_GALLERY_IMAGES);
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(DEFAULT_HERO_SLIDES);
   const [settings, setSettings] = useState<Record<string, string>>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -199,6 +206,13 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
+  const refreshHeroSlides = useCallback(async () => {
+    const data = await fetchHeroSlides();
+    if (data && data.length > 0) {
+      setHeroSlides(data);
+    }
+  }, []);
+
   const refreshMemberProfile = useCallback(async () => {
     if (user?.id) {
       await fetchMemberProfile(user.id);
@@ -208,11 +222,12 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [roomsData, reviewsData, offersData, galleryData, settingsData] = await Promise.all([
+      const [roomsData, reviewsData, offersData, galleryData, heroData, settingsData] = await Promise.all([
         fetchRooms(),
         fetchReviews(),
         fetchOffers(),
         fetchGallery(),
+        fetchHeroSlides(),
         fetchSiteSettings()
       ]);
 
@@ -220,6 +235,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (reviewsData && reviewsData.length > 0) setReviews(reviewsData);
       if (offersData && offersData.length > 0) setOffers(offersData);
       if (galleryData && galleryData.length > 0) setGalleryImages(galleryData);
+      if (heroData && heroData.length > 0) setHeroSlides(heroData);
       if (settingsData) setSettings(settingsData);
     } catch (err) {
       console.warn('Error fetching hotel data:', err);
@@ -240,6 +256,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         reviews,
         offers,
         galleryImages,
+        heroSlides,
         landmarks: LANDMARKS,
         settings,
         loading,
@@ -256,6 +273,7 @@ export const HotelDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         refreshReviews,
         refreshOffers,
         refreshGallery,
+        refreshHeroSlides,
         refreshMemberProfile,
         refreshAll
       }}

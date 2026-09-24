@@ -25,3 +25,12 @@ export function getGalleryImageUrl(storagePath: string | null | undefined): stri
   const { data } = supabase.storage.from('gallery-images').getPublicUrl(storagePath);
   return data?.publicUrl || null;
 }
+
+export function getHeroImageUrl(storagePath: string | null | undefined): string | null {
+  if (!storagePath) return null;
+  if (storagePath.startsWith('http://') || storagePath.startsWith('https://')) {
+    return storagePath;
+  }
+  const { data } = supabase.storage.from('hero-images').getPublicUrl(storagePath);
+  return data?.publicUrl || null;
+}

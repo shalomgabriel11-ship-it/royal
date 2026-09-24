@@ -1,5 +1,5 @@
-import { RoomOption, ReviewItem, OfferItem, GalleryItem, LandmarkItem } from './types';
-import { supabase, getRoomImageUrl, getGalleryImageUrl } from './lib/supabase';
+import { RoomOption, ReviewItem, OfferItem, GalleryItem, LandmarkItem, HeroSlide, GalleryItemImage } from './types';
+import { supabase, getRoomImageUrl, getGalleryImageUrl, getHeroImageUrl } from './lib/supabase';
 
 export const WHATSAPP_NUMBER = "255762555557";
 
@@ -242,11 +242,39 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   address: 'Forest Mpya, Mzumbe University area, Mbeya 54113'
 };
 
+export const DEFAULT_HERO_SLIDES: HeroSlide[] = [
+  {
+    id: 'default-1',
+    storage_path: 'https://lh3.googleusercontent.com/d/1Jn2e24hAN8qEF5Ik348rieIR-Wj9keZK',
+    description: 'Royal Mgwasi Hotel Exterior & Gardens',
+    sort_order: 1,
+    is_active: true,
+    image_url: 'https://lh3.googleusercontent.com/d/1Jn2e24hAN8qEF5Ik348rieIR-Wj9keZK'
+  },
+  {
+    id: 'default-2',
+    storage_path: 'https://lh3.googleusercontent.com/d/1_INIP8HkvRd6dIm6WJdtKFvYGNrtynsN',
+    description: 'Serene Rooms & Executive Accommodations',
+    sort_order: 2,
+    is_active: true,
+    image_url: 'https://lh3.googleusercontent.com/d/1_INIP8HkvRd6dIm6WJdtKFvYGNrtynsN'
+  },
+  {
+    id: 'default-3',
+    storage_path: 'https://lh3.googleusercontent.com/d/1i5yrXWCKFGB5I9U-11961OklvOMfUa2F',
+    description: 'Swimming Pool & Garden Courtyard',
+    sort_order: 3,
+    is_active: true,
+    image_url: 'https://lh3.googleusercontent.com/d/1i5yrXWCKFGB5I9U-11961OklvOMfUa2F'
+  }
+];
+
 // Aliases for immediate consumption
 export const ROOMS: RoomOption[] = DEFAULT_ROOMS;
 export const REVIEWS: ReviewItem[] = DEFAULT_REVIEWS;
 export const OFFERS: OfferItem[] = DEFAULT_OFFERS;
 export const GALLERY_IMAGES: GalleryItem[] = DEFAULT_GALLERY_IMAGES;
+export const HERO_SLIDES: HeroSlide[] = DEFAULT_HERO_SLIDES;
 
 // Supabase Direct Query Functions
 export async function fetchRooms(): Promise<RoomOption[]> {
@@ -389,11 +417,52 @@ export async function fetchOffers(): Promise<OfferItem[]> {
   }
 }
 
+export async function fetchHeroSlides(): Promise<HeroSlide[]> {
+  try {
+    const { data, error } = await supabase
+      .from('hero_slides')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      console.warn('Supabase hero_slides query error:', error.message);
+      return DEFAULT_HERO_SLIDES;
+    }
+
+    if (!data || data.length === 0) {
+      return DEFAULT_HERO_SLIDES;
+    }
+
+    return data.map((item: any) => ({
+      id: item.id,
+      storage_path: item.storage_path,
+      description: item.description || '',
+      sort_order: item.sort_order ?? 0,
+      is_active: Boolean(item.is_active),
+      image_url: getHeroImageUrl(item.storage_path) || item.storage_path
+    }));
+  } catch (err) {
+    console.warn('Error fetching hero slides from Supabase, using defaults:', err);
+    return DEFAULT_HERO_SLIDES;
+  }
+}
+
 export async function fetchGallery(): Promise<GalleryItem[]> {
   try {
     const { data, error } = await supabase
       .from('gallery_items')
-      .select('*')
+      .select(`
+        *,
+        gallery_item_images (
+          id,
+          gallery_item_id,
+          storage_path,
+          description,
+          sort_order,
+          is_cover
+        )
+      `)
       .eq('is_published', true)
       .order('sort_order', { ascending: true });
 
@@ -406,14 +475,46 @@ export async function fetchGallery(): Promise<GalleryItem[]> {
       return DEFAULT_GALLERY_IMAGES;
     }
 
-    return data.map((item: any) => ({
-      id: item.id,
-      title: item.title,
-      category: item.category,
-      colorClass: item.color_class || 'ph--sand',
-      storage_path: item.storage_path,
-      image: getGalleryImageUrl(item.storage_path) || undefined
-    }));
+    return data.map((item: any) => {
+      const rawImages: GalleryItemImage[] = (item.gallery_item_images || [])
+        .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+        .map((img: any) => ({
+          id: img.id,
+          gallery_item_id: img.gallery_item_id,
+          storage_path: img.storage_path,
+          description: img.description || null,
+          sort_order: img.sort_order || 0,
+          is_cover: Boolean(img.is_cover),
+          image_url: getGalleryImageUrl(img.storage_path) || img.storage_path
+        }));
+
+      // Find cover image or first image
+      const coverImg = rawImages.find(img => img.is_cover) || rawImages[0];
+      const mainImageUrl = coverImg?.image_url || getGalleryImageUrl(item.storage_path) || undefined;
+
+      // Image URLs array for carousel
+      let imageUrls: string[] = rawImages
+        .map(img => img.image_url)
+        .filter((url): url is string => Boolean(url));
+
+      // If no images in gallery_item_images, fall back to item.storage_path as cover
+      if (imageUrls.length === 0 && item.storage_path) {
+        const singleUrl = getGalleryImageUrl(item.storage_path);
+        if (singleUrl) imageUrls = [singleUrl];
+      }
+
+      return {
+        id: item.id,
+        title: item.title,
+        category: item.category,
+        colorClass: item.color_class || 'ph--sand',
+        storage_path: item.storage_path,
+        image: mainImageUrl,
+        images: imageUrls,
+        gallery_images: rawImages,
+        is_published: item.is_published
+      };
+    });
   } catch (err) {
     console.warn('Error fetching gallery from Supabase, using defaults:', err);
     return DEFAULT_GALLERY_IMAGES;

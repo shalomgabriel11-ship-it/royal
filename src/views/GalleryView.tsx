@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
 import { useHotelData } from '../context/HotelDataContext';
+import { GalleryCardMedia } from '../components/GalleryCardMedia';
 
 interface GalleryViewProps {
   setActivePage?: (page: PageView) => void;
@@ -165,22 +166,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ setActivePage }) => {
         ) : (
           <div className="grid grid--3">
             {filteredImages.map((img) => (
-              <div key={img.id} className={`ph ${img.colorClass} min-h-[260px] relative overflow-hidden group`}>
-                {img.image && (
-                  <img 
-                    src={img.image} 
-                    alt={img.title} 
-                    loading="lazy"
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
-                  />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent pointer-events-none z-[1]" />
-                <div className="ph__label z-[2] relative">
-                  {img.title}
-                  <small>Category: {img.category} &middot; Royal Mgwasi Hotel</small>
-                </div>
-              </div>
+              <GalleryCardMedia key={img.id} item={img} />
             ))}
           </div>
         )}

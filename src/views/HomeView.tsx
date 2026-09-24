@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageView } from '../types';
-import { formatWhatsAppUrl } from '../data';
+import { formatWhatsAppUrl, DEFAULT_HERO_SLIDES } from '../data';
 import { RoomCardMedia } from '../components/RoomCardMedia';
 import { useHotelData } from '../context/HotelDataContext';
 
@@ -11,10 +11,40 @@ interface HomeViewProps {
 
 export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
   const navigate = useNavigate();
-  const { rooms, reviews, landmarks, initialLoading } = useHotelData();
+  const { rooms, reviews, landmarks, initialLoading, heroSlides } = useHotelData();
   const trackRef = useRef<HTMLDivElement>(null);
   const [isPrevDisabled, setIsPrevDisabled] = useState(true);
   const [isNextDisabled, setIsNextDisabled] = useState(false);
+
+  // Active hero slides with fallback to the 3 default photos
+  const activeSlides = useMemo(() => {
+    return heroSlides && heroSlides.length > 0 ? heroSlides : DEFAULT_HERO_SLIDES;
+  }, [heroSlides]);
+
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [prevHeroIndex, setPrevHeroIndex] = useState<number | null>(null);
+
+  // Re-adjust index if slide list changes length
+  useEffect(() => {
+    if (currentHeroIndex >= activeSlides.length) {
+      setCurrentHeroIndex(0);
+      setPrevHeroIndex(null);
+    }
+  }, [activeSlides.length, currentHeroIndex]);
+
+  // Dynamic JS-driven Ken Burns slideshow (advances every 6 seconds)
+  useEffect(() => {
+    if (activeSlides.length <= 1) return;
+
+    const timer = setInterval(() => {
+      setCurrentHeroIndex((prev) => {
+        setPrevHeroIndex(prev);
+        return (prev + 1) % activeSlides.length;
+      });
+    }, 6000);
+
+    return () => clearInterval(timer);
+  }, [activeSlides.length]);
 
   const goTo = (page: PageView) => {
     if (setActivePage) setActivePage(page);
@@ -119,11 +149,23 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
               </div>
             </div>
             <div className="hero__image ph">
-              <div className="hero__slide hero__slide--1" aria-hidden="true"></div>
-              <div className="hero__slide hero__slide--2" aria-hidden="true"></div>
-              <div className="hero__slide hero__slide--3" aria-hidden="true"></div>
+              {activeSlides.map((slide, idx) => {
+                const isActive = idx === currentHeroIndex;
+                const isPrev = idx === prevHeroIndex;
+                const isSingle = activeSlides.length === 1;
+                const bgUrl = slide.image_url || slide.storage_path;
+
+                return (
+                  <div
+                    key={slide.id || idx}
+                    className={`hero__slide-dynamic ${isSingle ? 'is-single' : ''} ${isActive ? 'is-active' : ''} ${isPrev ? 'is-prev' : ''}`}
+                    style={{ backgroundImage: `url('${bgUrl}')` }}
+                    aria-hidden={!isActive}
+                  />
+                );
+              })}
               <div className="ph__label">
-                Royal Mgwasi Hotel Exterior &amp; Gardens
+                {activeSlides[currentHeroIndex]?.description || 'Royal Mgwasi Hotel Exterior & Gardens'}
                 <small>Welcome to Forest Mpya, Mbeya</small>
               </div>
             </div>
