@@ -47,6 +47,7 @@ export const AdminGallerySection: React.FC = () => {
   const { refreshGallery } = useHotelData();
   const [items, setItems] = useState<GalleryItemRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -463,26 +464,67 @@ export const AdminGallerySection: React.FC = () => {
   };
 
   const handleSeedDefaults = async () => {
+    if (loading || seeding) return;
+
+    setSeeding(true);
     setLoading(true);
     try {
-      for (let i = 0; i < DEFAULT_GALLERY_IMAGES.length; i++) {
-        const item = DEFAULT_GALLERY_IMAGES[i];
+      // 1. Fetch current gallery items from Supabase to check for existing items by title
+      const { data: existingRows, error: fetchErr } = await supabase
+        .from('gallery_items')
+        .select('id, title, sort_order');
+
+      if (fetchErr) throw fetchErr;
+
+      const currentItems = existingRows || [];
+      const existingTitles = new Set(
+        [...items, ...currentItems].map((r: any) => (r.title || '').trim().toLowerCase())
+      );
+
+      // Skip items whose title already exists
+      const itemsToSeed = DEFAULT_GALLERY_IMAGES.filter(
+        item => !existingTitles.has(item.title.trim().toLowerCase())
+      );
+
+      if (itemsToSeed.length === 0) {
+        showToast('All default gallery items already exist in database');
+        await fetchGalleryData();
+        return;
+      }
+
+      // Calculate starting sort order to place new items after existing ones
+      let maxSortOrder = Math.max(
+        0,
+        ...currentItems.map((r: any) => r.sort_order || 0),
+        ...items.map(i => i.sort_order || 0)
+      );
+
+      let seededCount = 0;
+      for (let i = 0; i < itemsToSeed.length; i++) {
+        const item = itemsToSeed[i];
+        maxSortOrder += 1;
         const storagePath = item.storage_path || `default/gallery_${i + 1}.jpg`;
         
-        const { data: created } = await supabase
+        const { data: created, error: insertErr } = await supabase
           .from('gallery_items')
           .insert({
             title: item.title,
             category: item.category,
             storage_path: storagePath,
             color_class: item.colorClass || 'ph--forest',
-            sort_order: i + 1,
+            sort_order: maxSortOrder,
             is_published: true
           })
           .select()
           .single();
 
+        if (insertErr) {
+          console.error('Error inserting default gallery item:', insertErr);
+          continue;
+        }
+
         if (created) {
+          seededCount++;
           // Also create initial gallery_item_images row
           await supabase.from('gallery_item_images').insert({
             gallery_item_id: created.id,
@@ -493,12 +535,20 @@ export const AdminGallerySection: React.FC = () => {
           });
         }
       }
-      showToast('Seeded default hotel gallery albums into Supabase');
-      fetchGalleryData();
+
+      if (seededCount > 0) {
+        showToast(`Seeded ${seededCount} default gallery item${seededCount > 1 ? 's' : ''} into Supabase`);
+      } else {
+        showToast('Default gallery items already exist');
+      }
+
+      await fetchGalleryData();
       refreshGallery();
     } catch (err: any) {
+      console.error('Error seeding gallery:', err);
       showToast(err?.message || 'Failed to seed gallery', 'error');
     } finally {
+      setSeeding(false);
       setLoading(false);
     }
   };
@@ -593,9 +643,11 @@ export const AdminGallerySection: React.FC = () => {
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={handleSeedDefaults}
-              className="px-4 py-2 bg-[#1D5D4C] text-white text-xs font-semibold rounded-lg hover:bg-[#154639] cursor-pointer"
+              disabled={loading || seeding || items.length > 0}
+              className="px-4 py-2 bg-[#1D5D4C] text-white text-xs font-semibold rounded-lg hover:bg-[#154639] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Seed Default Property Photos
+              {seeding && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+              <span>{seeding ? 'Seeding Gallery...' : 'Seed Default Gallery Items'}</span>
             </button>
           </div>
         </div>
