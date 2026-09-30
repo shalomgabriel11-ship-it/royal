@@ -11,7 +11,7 @@ interface HomeViewProps {
 
 export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
   const navigate = useNavigate();
-  const { rooms, reviews, landmarks, initialLoading, heroSlides } = useHotelData();
+  const { rooms, reviews, landmarks, initialLoading, heroSlides, galleryImages } = useHotelData();
   const trackRef = useRef<HTMLDivElement>(null);
   const [isPrevDisabled, setIsPrevDisabled] = useState(true);
   const [isNextDisabled, setIsNextDisabled] = useState(false);
@@ -20,6 +20,74 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
   const activeSlides = useMemo(() => {
     return heroSlides && heroSlides.length > 0 ? heroSlides : DEFAULT_HERO_SLIDES;
   }, [heroSlides]);
+
+  // Real dining items from gallery database
+  const diningTiles = useMemo(() => {
+    const diningCategoryItems = galleryImages.filter(
+      (img) => img.category.toLowerCase() === 'dining'
+    );
+    if (diningCategoryItems.length > 0) {
+      // Prioritize signature dining dishes and venues:
+      const breakfast = diningCategoryItems.find((img) =>
+        img.title.toLowerCase().includes('breakfast')
+      );
+      const tilapia = diningCategoryItems.find((img) =>
+        img.title.toLowerCase().includes('tilapia')
+      );
+      const restaurant = diningCategoryItems.find(
+        (img) =>
+          img.title.toLowerCase().includes('restaurant') ||
+          img.title.toLowerCase().includes('lounge')
+      );
+
+      const featured = [breakfast, tilapia, restaurant].filter(Boolean);
+      for (const item of diningCategoryItems) {
+        if (featured.length >= 3) break;
+        if (!featured.some((f) => f?.id === item.id)) {
+          featured.push(item);
+        }
+      }
+      return featured.filter((item): item is typeof diningCategoryItems[0] => Boolean(item));
+    }
+    return [];
+  }, [galleryImages]);
+
+  // Real amenity items from gallery database: Pool, Weekend Live Band, Grounds / Conference Hall
+  const amenityTiles = useMemo(() => {
+    // 1. Pool: Outdoor Swimming Pool
+    const pool = galleryImages.find(
+      (img) =>
+        img.category.toLowerCase() === 'pool' ||
+        img.title.toLowerCase().includes('pool')
+    );
+    // 2. Entertainment: Weekend Live Band Stage
+    const liveBand = galleryImages.find(
+      (img) =>
+        img.title.toLowerCase().includes('live band') ||
+        img.title.toLowerCase().includes('band')
+    );
+    // 3. Grounds & Gardens or Event Hall
+    const grounds =
+      galleryImages.find(
+        (img) =>
+          img.category.toLowerCase() === 'grounds' &&
+          img.title.toLowerCase().includes('grounds')
+      ) ||
+      galleryImages.find((img) => img.category.toLowerCase() === 'grounds') ||
+      galleryImages.find((img) => img.title.toLowerCase().includes('conference'));
+
+    const featured = [pool, liveBand, grounds].filter(Boolean);
+    if (featured.length === 3) {
+      return featured.filter((item): item is typeof galleryImages[0] => Boolean(item));
+    }
+
+    const nonDining = galleryImages.filter(
+      (img) =>
+        img.category.toLowerCase() !== 'dining' &&
+        img.category.toLowerCase() !== 'rooms'
+    );
+    return nonDining.slice(0, 3);
+  }, [galleryImages]);
 
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [prevHeroIndex, setPrevHeroIndex] = useState<number | null>(null);
@@ -317,22 +385,52 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
               </button>
             </div>
             <div className="hub-tiles">
-              <div className="ph ph--sand">
-                <div className="ph__label">Fresh Breakfast</div>
-              </div>
-              <div className="ph ph--forest">
-                <div className="ph__label">Signature Tilapia</div>
-              </div>
-              <div className="ph ph--dusk">
-                <div className="ph__label">Weekend Live Band</div>
-              </div>
+              {diningTiles.length > 0 ? (
+                diningTiles.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => goTo('dining')}
+                    className={`ph ${item.colorClass || 'ph--forest'} relative overflow-hidden group cursor-pointer transition-transform duration-300 hover:scale-[1.02] shadow-xs`}
+                  >
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent pointer-events-none z-[1]" />
+                    {item.images && item.images.length > 1 && (
+                      <span className="absolute top-2.5 right-2.5 z-[2] px-2 py-0.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold rounded-full border border-white/10">
+                        {item.images.length} photos
+                      </span>
+                    )}
+                    <div className="ph__label relative z-[2]">
+                      {item.title}
+                      <small className="line-clamp-1">
+                        {item.gallery_images?.[0]?.description || `${item.category} · Royal Mgwasi Hotel`}
+                      </small>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                [1, 2, 3].map((n) => (
+                  <div key={n} className="ph ph--sand animate-pulse min-h-[190px]">
+                    <div className="ph__label">&nbsp;</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           <div className="hub-panel tan">
             <div className="hub-panel__head">
               <h3>Amenities at ROYAL MGWASI HOTEL</h3>
-              <button onClick={() => goTo('dining')} className="link-arrow">
+              <button onClick={() => goTo('gallery')} className="link-arrow">
                 More amenities details 
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M2 7h10M8 3l4 4-4 4"/>
@@ -340,13 +438,45 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActivePage }) => {
               </button>
             </div>
             <div className="hub-tiles">
-              <div className="ph ph--slate"><div className="ph__label">Outdoor Pool</div></div>
-              <div className="ph ph--sand">
-                <div className="ph__label">Breakfast &amp; Restaurant</div>
-              </div>
-              <div className="ph ph--dusk">
-                <div className="ph__label">Weekend Live Music</div>
-              </div>
+              {amenityTiles.length > 0 ? (
+                amenityTiles.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => goTo('gallery')}
+                    className={`ph ${item.colorClass || 'ph--slate'} relative overflow-hidden group cursor-pointer transition-transform duration-300 hover:scale-[1.02] shadow-xs`}
+                  >
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent pointer-events-none z-[1]" />
+                    {item.images && item.images.length > 1 && (
+                      <span className="absolute top-2.5 right-2.5 z-[2] px-2 py-0.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold rounded-full border border-white/10">
+                        {item.images.length} photos
+                      </span>
+                    )}
+                    <div className="ph__label relative z-[2]">
+                      {item.title}
+                      <small className="line-clamp-1">
+                        {item.gallery_images?.[0]?.description || `${item.category} · Royal Mgwasi Hotel`}
+                      </small>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                [1, 2, 3].map((n) => (
+                  <div key={n} className="ph ph--slate animate-pulse min-h-[190px]">
+                    <div className="ph__label">&nbsp;</div>
+                  </div>
+                ))
+              )}
             </div>
             <ul className="amenity-list">
               <li>&#127946; Outdoor Pool</li>

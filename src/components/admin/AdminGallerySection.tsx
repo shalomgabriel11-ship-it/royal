@@ -100,15 +100,20 @@ export const AdminGallerySection: React.FC = () => {
 
       if (error) throw error;
       
-      const formattedItems = (data || []).map((item: any) => {
+      // Deduplicate rows by id to ensure unique album cards even if query or policy returns duplicates
+      const seenIds = new Set<string>();
+      const formattedItems: GalleryItemRow[] = [];
+      for (const item of (data || [])) {
+        if (!item?.id || seenIds.has(item.id)) continue;
+        seenIds.add(item.id);
         // Sort child photos by sort_order
         const images: GalleryItemImageRow[] = (item.gallery_item_images || [])
           .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
-        return {
+        formattedItems.push({
           ...item,
           gallery_item_images: images
-        };
-      });
+        });
+      }
 
       setItems(formattedItems);
 
@@ -554,8 +559,17 @@ export const AdminGallerySection: React.FC = () => {
   };
 
   const filteredItems = useMemo(() => {
-    if (selectedCategory === 'All') return items;
-    return items.filter(i => i.category.toLowerCase() === selectedCategory.toLowerCase());
+    const list = selectedCategory === 'All' 
+      ? items 
+      : items.filter(i => i.category.toLowerCase() === selectedCategory.toLowerCase());
+    
+    // Deduplicate by ID to guarantee every album card is rendered exactly once
+    const seen = new Set<string>();
+    return list.filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
   }, [items, selectedCategory]);
 
   return (
